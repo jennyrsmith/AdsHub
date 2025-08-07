@@ -1,5 +1,5 @@
-import axios from 'axios';
-import dotenv from 'dotenv';
+const axios = require('axios');
+const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
@@ -50,33 +50,39 @@ async function fetchInsightsForAccount(accountId, date, accessToken) {
     access_token: accessToken,
     fields: 'campaign_name,adset_name,ad_name,impressions,clicks,spend,cpc,ctr,purchase_roas,date_start,date_stop',
     time_range: JSON.stringify({ since: date, until: date }),
-    level: 'ad',
-    limit: 500
+    level: 'campaign',
+    limit: 500,
   };
 
   const results = [];
   let data = await makeRequest(url, params);
-  results.push(...data.data.map(item => ({ ...item, account_id: accountId })));
+  results.push(...data.data.map((item) => ({ ...item, account_id: accountId })));
 
   // Handle pagination
   while (data.paging?.next) {
     data = await makeRequest(data.paging.next);
-    results.push(...data.data.map(item => ({ ...item, account_id: accountId })));
+    results.push(...data.data.map((item) => ({ ...item, account_id: accountId })));
   }
 
   return results;
 }
 
 /**
- * Fetch yesterday's Facebook Ads insights for an array of ad account IDs
- * @param {string[]} accountIds
+ * Fetch yesterday's Facebook Ads insights for all ad accounts in FB_AD_ACCOUNTS
  * @returns {Promise<Array<object>>} aggregated results for all accounts
  */
-export async function fetchFacebookInsights(accountIds = []) {
+async function fetchFacebookInsights() {
   const accessToken = process.env.FB_ACCESS_TOKEN;
+  const accountEnv = process.env.FB_AD_ACCOUNTS;
   if (!accessToken) {
     throw new Error('Missing FB_ACCESS_TOKEN in environment variables');
   }
+  if (!accountEnv) {
+    throw new Error('Missing FB_AD_ACCOUNTS in environment variables');
+  }
+
+  const accountIds = accountEnv.split(',').map((id) => id.trim()).filter(Boolean);
+
   const yesterday = new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   const date = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
@@ -87,9 +93,14 @@ export async function fetchFacebookInsights(accountIds = []) {
       try {
         const accountResults = await fetchInsightsForAccount(id, date, accessToken);
         allResults.push(...accountResults);
-        console.log(`${new Date().toISOString()} - Fetched ${accountResults.length} records for account ${id}`);
+        console.log(
+          `${new Date().toISOString()} - Fetched ${accountResults.length} records for account ${id}`
+        );
       } catch (err) {
-        console.error(`${new Date().toISOString()} - Error fetching data for account ${id}:`, err.response?.data || err.message);
+        console.error(
+          `${new Date().toISOString()} - Error fetching data for account ${id}:`,
+          err.response?.data || err.message
+        );
       }
     })
   );
@@ -97,5 +108,5 @@ export async function fetchFacebookInsights(accountIds = []) {
   return allResults;
 }
 
-export default { fetchFacebookInsights };
+module.exports = { fetchFacebookInsights };
 

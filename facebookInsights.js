@@ -1,5 +1,5 @@
-const axios = require('axios');
-const dotenv = require('dotenv');
+import axios from 'axios';
+import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
@@ -71,7 +71,7 @@ async function fetchInsightsForAccount(accountId, date, accessToken) {
  * Fetch yesterday's Facebook Ads insights for all ad accounts in FB_AD_ACCOUNTS
  * @returns {Promise<Array<object>>} aggregated results for all accounts
  */
-async function fetchFacebookInsights() {
+export async function fetchFacebookInsights() {
   const accessToken = process.env.FB_ACCESS_TOKEN;
   const accountEnv = process.env.FB_AD_ACCOUNTS;
   if (!accessToken) {
@@ -81,7 +81,10 @@ async function fetchFacebookInsights() {
     throw new Error('Missing FB_AD_ACCOUNTS in environment variables');
   }
 
-  const accountIds = accountEnv.split(',').map((id) => id.trim()).filter(Boolean);
+  const accountIds = accountEnv
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
 
   const yesterday = new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
@@ -107,6 +110,4 @@ async function fetchFacebookInsights() {
 
   return allResults;
 }
-
-module.exports = { fetchFacebookInsights };
 

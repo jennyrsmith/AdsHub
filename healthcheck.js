@@ -8,6 +8,7 @@ dotenv.config();
 const { Pool } = pkg;
 
 async function run() {
+  let exitCode = 0;
   try {
     if (!process.env.PG_URI) {
       throw new Error('Missing PG_URI');
@@ -15,16 +16,25 @@ async function run() {
     const pool = new Pool({ connectionString: process.env.PG_URI });
     const client = await pool.connect();
     try {
-      const res = await client.query(
-        'SELECT date_start, campaign_name, spend FROM facebook_ad_insights ORDER BY date_start DESC LIMIT 10'
+      const countRes = await client.query(
+        "SELECT COUNT(*) FROM facebook_ad_insights WHERE fetched_at >= NOW() - INTERVAL '24 hours'"
       );
-      res.rows.forEach((r) => {
-        log(`DB Row: ${r.date_start.toISOString().slice(0,10)} | ${r.campaign_name} | ${r.spend}`);
-      });
+      const lastRes = await client.query(
+        'SELECT MAX(fetched_at) as last FROM facebook_ad_insights'
+      );
+      const rows = Number(countRes.rows[0].count);
+      const lastWrite = lastRes.rows[0].last;
+      log(`Rows added in last 24h: ${rows}`);
+      log(`Last DB write: ${lastWrite}`);
+      if (!lastWrite || new Date(lastWrite) < Date.now() - 24 * 60 * 60 * 1000) {
+        log('Last DB write is older than 24 hours');
+        exitCode = 1;
+      }
     } finally {
       client.release();
     }
   } catch (err) {
+    exitCode = 1;
     await logError('Healthcheck database query failed', err);
   }
 
@@ -43,11 +53,22 @@ async function run() {
         fileId: process.env.GOOGLE_SHEET_ID,
         fields: 'modifiedTime',
       });
-      log(`Google Sheet last modified: ${file.data.modifiedTime}`);
+      const modified = file.data.modifiedTime;
+      log(`Google Sheet last modified: ${modified}`);
+      if (!modified || new Date(modified) < Date.now() - 24 * 60 * 60 * 1000) {
+        log('Google Sheets sync is older than 24 hours');
+        exitCode = 1;
+      }
     } catch (err) {
+      exitCode = 1;
       await logError('Healthcheck Google Sheets check failed', err);
     }
   }
+
+  process.exit(exitCode);
 }
 
-run().catch((err) => logError('Healthcheck failed', err));
+run().catch(async (err) => {
+  await logError('Healthcheck failed', err);
+  process.exit(1);
+});

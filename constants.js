@@ -15,3 +15,7 @@ export const INSIGHT_FIELDS = [
 export const HEADERS = ['account_id', ...INSIGHT_FIELDS];
 
 export const SHEET_NAME = 'Facebook Ads';
+
+// Map of ad account IDs to their respective timezones
+// Example: { '1234567890': 'America/Chicago' }
+export const ACCOUNT_TIMEZONES = {};

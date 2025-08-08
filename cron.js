@@ -1,35 +1,44 @@
 import cron from 'node-cron';
+import chalk from 'chalk';
 import { fetchFacebookInsights } from './facebookInsights.js';
 import { saveToDatabase } from './saveToDatabase.js';
 import { pushToGoogleSheets } from './pushToGoogleSheets.js';
+import { exportToCSV } from './exportToCsv.js';
+import { log, logError, timeUTC } from './logger.js';
 
 const timezone = 'America/Chicago';
 
-const log = (message) => {
-  console.log(`${new Date().toISOString()} - ${message}`);
-};
+cron.schedule(
+  '0 3,9,15,21 * * *',
+  async () => {
+    log(chalk.cyan(`⏳ Starting Google Sheets sync at ${timeUTC()}`));
+    try {
+      const insights = await fetchFacebookInsights();
+      exportToCSV(insights);
+      await pushToGoogleSheets(insights);
+      log(chalk.green(`✅ Sheets sync completed at ${timeUTC()}`));
+    } catch (err) {
+      await logError(`❌ Sheets sync failed at ${timeUTC()}`, err);
+    }
+  },
+  { timezone }
+);
 
-cron.schedule('0 3,9,15,21 * * *', async () => {
-  log('Running Google Sheets sync');
-  try {
-    const insights = await fetchFacebookInsights();
-    await pushToGoogleSheets(insights);
-    log('Google Sheets sync successful');
-  } catch (err) {
-    console.error(`${new Date().toISOString()} - Google Sheets sync failed:`, err.message);
-  }
-}, { timezone });
+cron.schedule(
+  '0 0 * * *',
+  async () => {
+    log(chalk.cyan(`⏳ Starting database sync at ${timeUTC()}`));
+    try {
+      const insights = await fetchFacebookInsights();
+      exportToCSV(insights);
+      await saveToDatabase(insights);
+      log(chalk.green(`✅ Synced to DB at ${timeUTC()}`));
+    } catch (err) {
+      await logError(`❌ Database sync failed at ${timeUTC()}`, err);
+    }
+  },
+  { timezone }
+);
 
-cron.schedule('0 0 * * *', async () => {
-  log('Running database sync');
-  try {
-    const insights = await fetchFacebookInsights();
-    await saveToDatabase(insights);
-    log('Database sync successful');
-  } catch (err) {
-    console.error(`${new Date().toISOString()} - Database sync failed:`, err.message);
-  }
-}, { timezone });
-
-log('Cron jobs scheduled');
+log(chalk.yellow('Cron jobs scheduled'));
 

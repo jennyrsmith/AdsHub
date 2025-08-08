@@ -1,5 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { log, logError, timeUTC } from './logger.js';
+import { INSIGHT_FIELDS } from './constants.js';
 
 // Load environment variables
 dotenv.config();
@@ -48,7 +50,7 @@ async function fetchInsightsForAccount(accountId, date, accessToken) {
   const url = `${FB_API_BASE_URL}/${actId}/insights`;
   const params = {
     access_token: accessToken,
-    fields: 'campaign_name,adset_name,ad_name,impressions,clicks,spend,cpc,ctr,purchase_roas,date_start,date_stop',
+    fields: INSIGHT_FIELDS.join(','),
     time_range: JSON.stringify({ since: date, until: date }),
     level: 'campaign',
     limit: 500,
@@ -72,42 +74,44 @@ async function fetchInsightsForAccount(accountId, date, accessToken) {
  * @returns {Promise<Array<object>>} aggregated results for all accounts
  */
 export async function fetchFacebookInsights() {
-  const accessToken = process.env.FB_ACCESS_TOKEN;
-  const accountEnv = process.env.FB_AD_ACCOUNTS;
-  if (!accessToken) {
-    throw new Error('Missing FB_ACCESS_TOKEN in environment variables');
+  log(`Fetching Facebook insights at ${timeUTC()}`);
+  try {
+    const accessToken = process.env.FB_ACCESS_TOKEN;
+    const accountEnv = process.env.FB_AD_ACCOUNTS;
+    if (!accessToken) {
+      throw new Error('Missing FB_ACCESS_TOKEN in environment variables');
+    }
+    if (!accountEnv) {
+      throw new Error('Missing FB_AD_ACCOUNTS in environment variables');
+    }
+
+    const accountIds = accountEnv
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const date = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const allResults = [];
+    await Promise.all(
+      accountIds.map(async (id) => {
+        try {
+          const accountResults = await fetchInsightsForAccount(id, date, accessToken);
+          allResults.push(...accountResults);
+          log(`Fetched ${accountResults.length} records for account ${id}`);
+        } catch (err) {
+          await logError(`Error fetching data for account ${id}`, err);
+        }
+      })
+    );
+
+    log(`Fetched ${allResults.length} total records at ${timeUTC()}`);
+    return allResults;
+  } catch (err) {
+    await logError(`Fetching Facebook insights failed at ${timeUTC()}`, err);
+    throw err;
   }
-  if (!accountEnv) {
-    throw new Error('Missing FB_AD_ACCOUNTS in environment variables');
-  }
-
-  const accountIds = accountEnv
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
-
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const date = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
-
-  const allResults = [];
-  await Promise.all(
-    accountIds.map(async (id) => {
-      try {
-        const accountResults = await fetchInsightsForAccount(id, date, accessToken);
-        allResults.push(...accountResults);
-        console.log(
-          `${new Date().toISOString()} - Fetched ${accountResults.length} records for account ${id}`
-        );
-      } catch (err) {
-        console.error(
-          `${new Date().toISOString()} - Error fetching data for account ${id}:`,
-          err.response?.data || err.message
-        );
-      }
-    })
-  );
-
-  return allResults;
 }
 

@@ -32,6 +32,9 @@ export async function logError(message, error) {
       console.error(`${new Date().toISOString()} - Failed to send Slack notification: ${err.message}`);
     }
   }
+  if (process.env.ERROR_ALERT_EMAIL) {
+    console.log(`Would send email to ${process.env.ERROR_ALERT_EMAIL}: ${entry}`);
+  }
 }
 
 export const timeUTC = () => `${new Date().toISOString().slice(11,16)} UTC`;

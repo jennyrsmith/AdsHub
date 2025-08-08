@@ -1,7 +1,8 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { DateTime } from 'luxon';
 import { log, logError, timeUTC } from './logger.js';
-import { INSIGHT_FIELDS } from './constants.js';
+import { INSIGHT_FIELDS, ACCOUNT_TIMEZONES } from './constants.js';
 
 // Load environment variables
 dotenv.config();
@@ -45,7 +46,7 @@ async function makeRequest(url, params = {}, retries = 5, attempt = 0) {
  * @param {string} accessToken
  * @returns {Promise<Array<object>>}
  */
-async function fetchInsightsForAccount(accountId, date, accessToken) {
+export async function fetchInsightsForAccount(accountId, date, accessToken) {
   const actId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
   const url = `${FB_API_BASE_URL}/${actId}/insights`;
   const params = {
@@ -90,13 +91,12 @@ export async function fetchFacebookInsights() {
       .map((id) => id.trim())
       .filter(Boolean);
 
-    const yesterday = new Date();
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const date = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
-
     const allResults = [];
     await Promise.all(
       accountIds.map(async (id) => {
+        const tz = ACCOUNT_TIMEZONES[id] || 'UTC';
+        const date = DateTime.now().setZone(tz).minus({ days: 1 }).toISODate();
+        log(`Fetching date ${date} for account ${id} (${tz})`);
         try {
           const accountResults = await fetchInsightsForAccount(id, date, accessToken);
           allResults.push(...accountResults);

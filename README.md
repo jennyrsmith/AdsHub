@@ -17,6 +17,7 @@ A Node.js service that pulls Facebook Ads insights and syncs them to PostgreSQL 
    PG_URI=postgres://user:pass@host/db
    GOOGLE_SHEET_ID=your_sheet_id
    SLACK_WEBHOOK_URL=https://hooks.slack.com/... # optional
+   ERROR_ALERT_EMAIL=alerts@example.com # optional
    ```
 
 3. **Run**
@@ -38,3 +39,22 @@ Logs are written to `logs/cron.log`.
 
 ## CSV Export
 Each sync writes a CSV copy in the `data/` folder named `facebook-insights-YYYY-MM-DD.csv`.
+
+## Backfill
+Run historical pulls between two dates:
+
+```
+npm run backfill 2024-01-01 2024-01-31
+```
+
+## Deployment to Render
+1. Push this repo to GitHub.
+2. In Render, create a **Background Worker** and connect it to your repo.
+3. Render reads `render.yaml` and the `Procfile` (`worker: node cron.js`) to build and start the service on Node 20.
+4. Set the required environment variables: `FB_ACCESS_TOKEN`, `FB_AD_ACCOUNTS`, `PG_URI`, `GOOGLE_SHEET_ID`, `SLACK_WEBHOOK_URL`, and optional `ERROR_ALERT_EMAIL`.
+5. Deploy; future commits to the `main` branch trigger automatic deploys.
+
+## Security
+- Rotate your Facebook App Secret regularly and generate a new long-lived `FB_ACCESS_TOKEN`.
+- `.env` and `credentials.json` are excluded from git via `.gitignore`.
+- When persistent failures occur the logger will note `Would send email to ...` using `ERROR_ALERT_EMAIL`.

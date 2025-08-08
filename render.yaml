@@ -1,0 +1,20 @@
+services:
+  - type: worker
+    name: fb-ads-worker
+    env: node
+    nodeVersion: 20
+    branch: main
+    autoDeploy: true
+    buildCommand: "npm install"
+    startCommand: "node cron.js"
+    envVars:
+      - key: FB_ACCESS_TOKEN
+        value: ""
+      - key: FB_AD_ACCOUNTS
+        value: ""
+      - key: PG_URI
+        value: ""
+      - key: GOOGLE_SHEET_ID
+        value: ""
+      - key: SLACK_WEBHOOK_URL
+        value: ""

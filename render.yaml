@@ -12,9 +12,19 @@ services:
         value: ""
       - key: FB_AD_ACCOUNTS
         value: ""
+      - key: FB_APP_ID
+        value: ""
+      - key: FB_APP_SECRET
+        value: ""
       - key: PG_URI
         value: ""
       - key: GOOGLE_SHEET_ID
         value: ""
+      - key: GOOGLE_ADS_CUSTOMER_ID
+        value: ""
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        value: ""
       - key: SLACK_WEBHOOK_URL
+        value: ""
+      - key: ERROR_ALERT_EMAIL
         value: ""

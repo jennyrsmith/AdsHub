@@ -1,6 +1,6 @@
 # AdsHub
 
-A Node.js service that pulls Facebook Ads insights and syncs them to PostgreSQL and Google Sheets.
+A Node.js service that pulls Facebook and YouTube Ads insights and syncs them to PostgreSQL and Google Sheets.
 
 ## Setup
 
@@ -14,8 +14,12 @@ A Node.js service that pulls Facebook Ads insights and syncs them to PostgreSQL 
    ```env
    FB_ACCESS_TOKEN=your_token
    FB_AD_ACCOUNTS=act_123,act_456
+   FB_APP_ID=your_fb_app_id
+   FB_APP_SECRET=your_fb_app_secret
    PG_URI=postgres://user:pass@host/db
    GOOGLE_SHEET_ID=your_sheet_id
+   GOOGLE_ADS_CUSTOMER_ID=123-456-7890
+   GOOGLE_ADS_DEVELOPER_TOKEN=your_google_ads_dev_token
    SLACK_WEBHOOK_URL=https://hooks.slack.com/... # optional
    ERROR_ALERT_EMAIL=alerts@example.com # optional
    ```
@@ -29,12 +33,14 @@ A Node.js service that pulls Facebook Ads insights and syncs them to PostgreSQL 
 The app writes insights to the `facebook_ad_insights` table. Connect using `PG_URI` and the script will create the table if needed.
 
 ## Google Sheets
-Place `credentials.json` for a service account in the project root. The sheet tab name is `Facebook Ads`.
+Place `credentials.json` for a service account in the project root. The sheet includes `Facebook Ads` and `YouTube Ads` tabs.
 
 ## Scheduling
 `cron.js` schedules:
-- Google Sheets sync at 03:00, 09:00, 15:00, and 21:00 UTC-6 (America/Chicago)
-- Database sync nightly at 00:00
+- Facebook & YouTube Sheets sync at 03:00, 09:00, 15:00, and 21:00 UTC-6 (America/Chicago)
+- Nightly database sync at 00:00
+- Healthcheck hourly with Slack/email alert after two failures
+- Morning summary at 08:00
 Logs are written to `logs/cron.log`.
 
 ## CSV Export
@@ -51,8 +57,15 @@ npm run backfill 2024-01-01 2024-01-31
 1. Push this repo to GitHub.
 2. In Render, create a **Background Worker** and connect it to your repo.
 3. Render reads `render.yaml` and the `Procfile` (`worker: node cron.js`) to build and start the service on Node 20.
-4. Set the required environment variables: `FB_ACCESS_TOKEN`, `FB_AD_ACCOUNTS`, `PG_URI`, `GOOGLE_SHEET_ID`, `SLACK_WEBHOOK_URL`, and optional `ERROR_ALERT_EMAIL`.
+4. Set the required environment variables: `FB_ACCESS_TOKEN`, `FB_AD_ACCOUNTS`, `FB_APP_ID`, `FB_APP_SECRET`, `PG_URI`, `GOOGLE_SHEET_ID`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `SLACK_WEBHOOK_URL`, and optional `ERROR_ALERT_EMAIL`.
 5. Deploy; future commits to the `main` branch trigger automatic deploys.
+
+## Token Rotation
+- Refresh the Facebook long-lived token every ~45 days:
+  ```bash
+  npm run rotate-token -- --write
+  ```
+  Omitting `--write` prints the new token without updating `.env`.
 
 ## Security
 - Rotate your Facebook App Secret regularly and generate a new long-lived `FB_ACCESS_TOKEN`.

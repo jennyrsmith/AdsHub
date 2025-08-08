@@ -1,5 +1,6 @@
 import pkg from 'pg';
 import { google } from 'googleapis';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { log, logError } from './logger.js';
 
@@ -12,6 +13,9 @@ async function run() {
   try {
     if (!process.env.PG_URI) {
       throw new Error('Missing PG_URI');
+    }
+    if (!process.env.GOOGLE_SHEET_ID || !fs.existsSync('credentials.json')) {
+      throw new Error('Missing Google Sheets credentials');
     }
     const pool = new Pool({ connectionString: process.env.PG_URI });
     const client = await pool.connect();
@@ -38,31 +42,29 @@ async function run() {
     await logError('Healthcheck database query failed', err);
   }
 
-  if (process.env.GOOGLE_SHEET_ID) {
-    try {
-      const auth = new google.auth.GoogleAuth({
-        keyFile: 'credentials.json',
-        scopes: [
-          'https://www.googleapis.com/auth/spreadsheets.readonly',
-          'https://www.googleapis.com/auth/drive.metadata.readonly',
-        ],
-      });
-      const client = await auth.getClient();
-      const drive = google.drive({ version: 'v3', auth: client });
-      const file = await drive.files.get({
-        fileId: process.env.GOOGLE_SHEET_ID,
-        fields: 'modifiedTime',
-      });
-      const modified = file.data.modifiedTime;
-      log(`Google Sheet last modified: ${modified}`);
-      if (!modified || new Date(modified) < Date.now() - 24 * 60 * 60 * 1000) {
-        log('Google Sheets sync is older than 24 hours');
-        exitCode = 1;
-      }
-    } catch (err) {
+  try {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: 'credentials.json',
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.metadata.readonly',
+      ],
+    });
+    const client = await auth.getClient();
+    const drive = google.drive({ version: 'v3', auth: client });
+    const file = await drive.files.get({
+      fileId: process.env.GOOGLE_SHEET_ID,
+      fields: 'modifiedTime',
+    });
+    const modified = file.data.modifiedTime;
+    log(`Google Sheet last modified: ${modified}`);
+    if (!modified || new Date(modified) < Date.now() - 24 * 60 * 60 * 1000) {
+      log('Google Sheets sync is older than 24 hours');
       exitCode = 1;
-      await logError('Healthcheck Google Sheets check failed', err);
     }
+  } catch (err) {
+    exitCode = 1;
+    await logError('Healthcheck Google Sheets check failed', err);
   }
 
   process.exit(exitCode);

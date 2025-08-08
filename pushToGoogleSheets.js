@@ -5,8 +5,14 @@ import { HEADERS, SHEET_NAME } from './constants.js';
 
 dotenv.config();
 
-export async function pushToGoogleSheets(insightsArray) {
-  log(`Pushing ${insightsArray.length} records to Google Sheets at ${timeUTC()}`);
+export async function pushToGoogleSheets(
+  insightsArray,
+  sheetName = SHEET_NAME,
+  headers = HEADERS
+) {
+  log(
+    `Pushing ${insightsArray.length} records to Google Sheets at ${timeUTC()}`
+  );
   if (!process.env.GOOGLE_SHEET_ID) {
     throw new Error('Missing GOOGLE_SHEET_ID in environment variables');
   }
@@ -21,19 +27,19 @@ export async function pushToGoogleSheets(insightsArray) {
     const sheets = google.sheets({ version: 'v4', auth: client });
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-    const rows = insightsArray.map((item) => HEADERS.map((h) => item[h]));
+    const rows = insightsArray.map((item) => headers.map((h) => item[h]));
 
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: `${SHEET_NAME}!A:Z`,
+      range: `${sheetName}!A:Z`,
     });
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: SHEET_NAME,
+      range: sheetName,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [HEADERS, ...rows],
+        values: [headers, ...rows],
       },
     });
     log(`✅ Sheets sync completed at ${timeUTC()}`);

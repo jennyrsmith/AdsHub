@@ -22,12 +22,14 @@ A Node.js service that pulls Facebook and YouTube Ads insights and syncs them to
    GOOGLE_ADS_DEVELOPER_TOKEN=your_google_ads_dev_token
    SLACK_WEBHOOK_URL=https://hooks.slack.com/... # optional
    ERROR_ALERT_EMAIL=alerts@example.com # optional
+   SYNC_API_KEY=some-long-random-string
    ```
 
 3. **Run**
    - Fetch data once: `npm start`
    - Start scheduled jobs: `npm run cron`
    - Health check: `npm run healthcheck`
+   - Start API server: `npm run server`
 
 ## Database
 The app writes insights to the `facebook_ad_insights` table. Connect using `PG_URI` and the script will create the table if needed.
@@ -45,6 +47,48 @@ Logs are written to `logs/cron.log`.
 
 ## CSV Export
 Each sync writes a CSV copy in the `data/` folder named `facebook-insights-YYYY-MM-DD.csv`.
+
+## Manual Control API
+Start the server with:
+
+```bash
+npm run server
+```
+
+### GET `/api/last-sync`
+Returns the most recent successful sync timestamps for each platform:
+
+```json
+{ "facebook": "2024-01-01T00:00:00.000Z", "youtube": "2024-01-01T00:00:00.000Z" }
+```
+
+### POST `/api/sync`
+Trigger an on-demand sync. Requires header `x-api-key: SYNC_API_KEY`.
+
+Body (optional):
+```json
+{ "platform": "facebook" | "youtube" | "all" }
+```
+
+Example:
+```bash
+curl -X POST http://localhost:3005/api/sync \
+  -H "x-api-key: $SYNC_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"platform":"facebook"}'
+```
+
+### GET `/api/summary?range=7|30`
+Returns spend, impressions, clicks, and ROAS for the last N days by platform.
+
+### GET `/api/export.csv?platform=facebook|youtube|all&start=YYYY-MM-DD&end=YYYY-MM-DD`
+Protected by `x-api-key`. Streams a CSV of raw records for the requested platform and date range.
+
+Fetch last sync example:
+
+```bash
+curl http://localhost:3005/api/last-sync
+```
 
 ## Backfill
 Run historical pulls between two dates:

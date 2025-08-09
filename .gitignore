@@ -1,5 +1,10 @@
-node_modules
-.env
+node_modules/
+ui/node_modules/
+ui/dist/
 logs/
-data/
+.env
 credentials.json
+token.json
+.DS_Store
+data/
+ui/.env

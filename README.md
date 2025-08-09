@@ -55,6 +55,8 @@ Start the server with:
 npm run server
 ```
 
+If a static dashboard exists in `ui/dist`, the server will also serve those files at the root path.
+
 ### GET `/api/last-sync`
 Returns the most recent successful sync timestamps for each platform:
 

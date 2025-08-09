@@ -4,13 +4,13 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "server": "node server.js",
     "start": "node index.js",
     "test": "node --test",
     "cron": "node cron.js",
     "healthcheck": "node healthcheck.js",
     "backfill": "node backfill.js",
-    "rotate-token": "node rotateToken.js",
-    "server": "node server.js"
+    "rotate-token": "node rotateToken.js"
   },
   "dependencies": {
     "axios": "^1.6.7",

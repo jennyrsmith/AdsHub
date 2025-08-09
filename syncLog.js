@@ -1,3 +1,4 @@
+// Helper utilities for tracking sync completion times in Postgres
 import pkg from 'pg';
 import dotenv from 'dotenv';
 import { logError } from './logger.js';

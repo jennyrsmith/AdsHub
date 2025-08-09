@@ -1,5 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DateTime } from 'luxon';
 import { log, logError } from './logger.js';
 import { fetchFacebookInsights } from './facebookInsights.js';
@@ -19,6 +21,8 @@ import {
 import { HEADERS, YOUTUBE_HEADERS } from './constants.js';
 
 dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function requireEnv(key) {
   if (!process.env[key]) {
@@ -195,6 +199,14 @@ app.get('/api/export.csv', checkApiKey, async (req, res) => {
     await logError('export.csv failed', err);
     res.status(500).end();
   }
+});
+
+const uiPath = path.join(__dirname, 'ui', 'dist');
+app.use(express.static(uiPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(uiPath, 'index.html'));
 });
 
 app.use(async (err, req, res, next) => {

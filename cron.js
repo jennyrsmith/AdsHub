@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import chalk from 'chalk';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { DateTime } from 'luxon';
 import { fetchFacebookInsights } from './facebookInsights.js';
 import { saveToDatabase } from './saveToDatabase.js';
 import { pushToGoogleSheets } from './pushToGoogleSheets.js';
@@ -18,6 +19,10 @@ import util from 'util';
 import { closeDb } from './lib/db.js';
 import { connectRedis, closeRedis } from './lib/redis.js';
 import { migrate } from './scripts/migrate.js';
+import {
+  refreshDailyRollup,
+  refreshRecentWindows,
+} from './lib/rollups.js';
 
 dotenv.config();
 
@@ -80,6 +85,17 @@ jobs.push(
         log(chalk.green(`✅ Synced to DB at ${timeUTC()}`));
       } catch (err) {
         await logError(`❌ Database sync failed at ${timeUTC()}`, err);
+      }
+      const rollStart = Date.now();
+      const yesterday = DateTime.now().setZone(timezone).minus({ days: 1 }).toISODate();
+      try {
+        log(chalk.cyan(`⏳ Refreshing rollups at ${timeUTC()}`));
+        await refreshDailyRollup(yesterday, yesterday);
+        await refreshRecentWindows();
+        const ms = Date.now() - rollStart;
+        log(chalk.green(`✅ Rollups refreshed in ${ms}ms`));
+      } catch (err) {
+        await logError('❌ Rollup refresh failed', err);
       }
     },
     { timezone }

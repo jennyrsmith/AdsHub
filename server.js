@@ -192,50 +192,106 @@ app.post('/api/sync', checkApiKey, async (req, res) => {
 
 app.get('/api/summary', maybeAuth, async (req, res, next) => {
   const range = Number(req.query.range || 7);
+  const source = req.query.source || 'auto';
   if (![7, 30].includes(range)) {
     return res.status(400).json({ error: 'range must be 7 or 30' });
+  }
+  if (!['raw', 'rollup', 'auto'].includes(source)) {
+    return res.status(400).json({ error: 'invalid source' });
   }
   try {
     const timezone = 'America/Chicago';
     const startDate = DateTime.now().setZone(timezone).minus({ days: range }).toISODate();
-    const cached = summaryCache.get(range);
+    const cacheKey = `${range}-${source}`;
+    const cached = summaryCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const fbRes = await queryWithRetry(
-      'SELECT COALESCE(SUM(spend),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks, COALESCE(SUM(purchase_roas * spend),0) as revenue FROM facebook_ad_insights WHERE date_start >= $1',
-      [startDate]
-    );
-    const ytRes = await queryWithRetry(
-      'SELECT COALESCE(SUM(cost),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks FROM youtube_ad_insights WHERE date_start >= $1',
-      [startDate]
-    );
-    const fb = fbRes.rows[0];
-    const yt = ytRes.rows[0];
-    const fbSpend = Number(fb.spend);
-    const fbRevenue = Number(fb.revenue) || 0;
-    const fbRoas = fbSpend ? fbRevenue / fbSpend : null;
-    const ytSpend = Number(yt.spend);
-    const ytRevenue = Number(yt.revenue) || null;
-    const ytRoas = ytRevenue && ytSpend ? ytRevenue / ytSpend : null;
-    const result = [
-      {
-        platform: 'facebook',
-        spend: fbSpend,
-        revenue: fbRevenue || null,
-        roas: fbRoas,
-        impressions: Number(fb.impressions),
-        clicks: Number(fb.clicks),
-      },
-      {
-        platform: 'youtube',
-        spend: ytSpend,
-        revenue: ytRevenue,
-        roas: ytRoas,
-        impressions: Number(yt.impressions),
-        clicks: Number(yt.clicks),
-      },
-    ];
-    summaryCache.set(range, result);
+    let rows = null;
+    if (source !== 'raw') {
+      const rollRes = await queryWithRetry(
+        'SELECT platform, SUM(spend) AS spend, SUM(revenue) AS revenue, SUM(impressions) AS impressions, SUM(clicks) AS clicks FROM daily_rollup WHERE date >= $1 GROUP BY platform',
+        [startDate]
+      );
+      if (source === 'rollup' || rollRes.rowCount === 2) {
+        rows = rollRes.rows;
+      }
+    }
+
+    let result;
+    if (rows) {
+      const map = {
+        facebook: { spend: 0, revenue: 0, impressions: 0, clicks: 0 },
+        youtube: { spend: 0, revenue: 0, impressions: 0, clicks: 0 },
+      };
+      for (const r of rows) {
+        map[r.platform] = {
+          spend: Number(r.spend) || 0,
+          revenue: Number(r.revenue) || 0,
+          impressions: Number(r.impressions) || 0,
+          clicks: Number(r.clicks) || 0,
+        };
+      }
+      const fbSpend = map.facebook.spend;
+      const fbRevenue = map.facebook.revenue;
+      const fbRoas = fbSpend ? fbRevenue / fbSpend : null;
+      const ytSpend = map.youtube.spend;
+      const ytRevenue = map.youtube.revenue || null;
+      const ytRoas = ytRevenue && ytSpend ? ytRevenue / ytSpend : null;
+      result = [
+        {
+          platform: 'facebook',
+          spend: fbSpend,
+          revenue: fbRevenue || null,
+          roas: fbRoas,
+          impressions: map.facebook.impressions,
+          clicks: map.facebook.clicks,
+        },
+        {
+          platform: 'youtube',
+          spend: ytSpend,
+          revenue: ytRevenue,
+          roas: ytRoas,
+          impressions: map.youtube.impressions,
+          clicks: map.youtube.clicks,
+        },
+      ];
+    } else {
+      const fbRes = await queryWithRetry(
+        'SELECT COALESCE(SUM(spend),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks, COALESCE(SUM(purchase_roas * spend),0) as revenue FROM facebook_ad_insights WHERE date_start >= $1',
+        [startDate]
+      );
+      const ytRes = await queryWithRetry(
+        'SELECT COALESCE(SUM(cost),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks FROM youtube_ad_insights WHERE date_start >= $1',
+        [startDate]
+      );
+      const fb = fbRes.rows[0];
+      const yt = ytRes.rows[0];
+      const fbSpend = Number(fb.spend);
+      const fbRevenue = Number(fb.revenue) || 0;
+      const fbRoas = fbSpend ? fbRevenue / fbSpend : null;
+      const ytSpend = Number(yt.spend);
+      const ytRevenue = Number(yt.revenue) || null;
+      const ytRoas = ytRevenue && ytSpend ? ytRevenue / ytSpend : null;
+      result = [
+        {
+          platform: 'facebook',
+          spend: fbSpend,
+          revenue: fbRevenue || null,
+          roas: fbRoas,
+          impressions: Number(fb.impressions),
+          clicks: Number(fb.clicks),
+        },
+        {
+          platform: 'youtube',
+          spend: ytSpend,
+          revenue: ytRevenue,
+          roas: ytRoas,
+          impressions: Number(yt.impressions),
+          clicks: Number(yt.clicks),
+        },
+      ];
+    }
+    summaryCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     next(err);

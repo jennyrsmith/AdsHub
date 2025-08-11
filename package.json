@@ -16,7 +16,8 @@
     "ui:lint": "cd ui && npm run lint",
     "start:web": "npm --prefix ui run dev",
     "migrate": "node scripts/migrate.js",
-    "db:rebuild": "node scripts/migrate.js"
+    "db:rebuild": "node scripts/migrate.js",
+    "rollup:backfill": "node rollupBackfill.js 2024-01-01 2025-08-01"
   },
   "dependencies": {
     "axios": "^1.6.7",

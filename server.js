@@ -20,6 +20,9 @@ import {
   pool,
 } from './syncLog.js';
 import { parseSort } from './sort.js';
+import { ensureIndexes } from './ensureIndexes.js';
+import { summaryCache } from './summaryCache.js';
+import { queryWithRetry } from './db.js';
 
 dotenv.config();
 
@@ -34,6 +37,7 @@ function requireEnv(key) {
 requireEnv('PG_URI');
 requireEnv('SYNC_API_KEY');
 ensureSyncLogTable().catch((err) => logError('sync_log init failed', err));
+ensureIndexes().catch((err) => logError('index init failed', err));
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -162,11 +166,14 @@ app.get('/api/summary', maybeAuth, async (req, res, next) => {
   try {
     const timezone = 'America/Chicago';
     const startDate = DateTime.now().setZone(timezone).minus({ days: range }).toISODate();
-    const fbRes = await pool.query(
+    const cached = summaryCache.get(range);
+    if (cached) return res.json(cached);
+
+    const fbRes = await queryWithRetry(
       'SELECT COALESCE(SUM(spend),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks, COALESCE(SUM(purchase_roas * spend),0) as revenue FROM facebook_ad_insights WHERE date_start >= $1',
       [startDate]
     );
-    const ytRes = await pool.query(
+    const ytRes = await queryWithRetry(
       'SELECT COALESCE(SUM(cost),0) as spend, COALESCE(SUM(impressions),0) as impressions, COALESCE(SUM(clicks),0) as clicks FROM youtube_ad_insights WHERE date_start >= $1',
       [startDate]
     );
@@ -178,7 +185,7 @@ app.get('/api/summary', maybeAuth, async (req, res, next) => {
     const ytSpend = Number(yt.spend);
     const ytRevenue = Number(yt.revenue) || null;
     const ytRoas = ytRevenue && ytSpend ? ytRevenue / ytSpend : null;
-    res.json([
+    const result = [
       {
         platform: 'facebook',
         spend: fbSpend,
@@ -195,7 +202,9 @@ app.get('/api/summary', maybeAuth, async (req, res, next) => {
         impressions: Number(yt.impressions),
         clicks: Number(yt.clicks),
       },
-    ]);
+    ];
+    summaryCache.set(range, result);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -214,18 +223,19 @@ app.get('/api/rows', maybeAuth, async (req, res, next) => {
   if (!start || !end) return res.status(400).json({ error: 'start and end required' });
   if (!['facebook', 'youtube', 'all'].includes(platform))
     return res.status(400).json({ error: 'invalid platform' });
-  const lim = Math.min(Number(limit) || 500, 2000);
+  const lim = Number(limit) || 500;
+  if (lim > 2000) return res.status(400).json({ error: 'limit must be <= 2000' });
   const off = Number(offset) || 0;
   try {
     const { unionSql, params } = buildUnionQuery({ platform, start, end, q });
     const orderClause = parseSort(sort);
-    const countRes = await pool.query(
+    const countRes = await queryWithRetry(
       `SELECT COUNT(*) FROM (${unionSql}) AS sub`,
       params
     );
     const idx = params.length + 1;
     const rowsSql = `SELECT * FROM (${unionSql}) AS sub ${orderClause} LIMIT $${idx} OFFSET $${idx + 1}`;
-    const rowsRes = await pool.query(rowsSql, [...params, lim, off]);
+    const rowsRes = await queryWithRetry(rowsSql, [...params, lim, off]);
     res.json({ rows: rowsRes.rows, total: Number(countRes.rows[0].count) });
   } catch (err) {
     next(err);

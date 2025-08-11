@@ -2,6 +2,12 @@
 
 A Node.js service that pulls Facebook and YouTube Ads insights and syncs them to PostgreSQL and Google Sheets.
 
+It runs as two processes:
+
+- **Web** – `server.js` serves the REST API and static UI.
+- **Worker** – `cron.js` schedules recurring sync and reporting jobs.
+Shared modules live under `lib/` and are used by both processes.
+
 ## Setup
 
 1. **Install dependencies**
@@ -27,9 +33,9 @@ A Node.js service that pulls Facebook and YouTube Ads insights and syncs them to
 
 3. **Run**
    - Fetch data once: `npm start`
-   - Start scheduled jobs: `npm run cron`
-   - Health check: `npm run healthcheck`
-   - Start API server: `npm run server`
+   - Start worker: `npm run cron`
+   - Start web server: `npm run server`
+   - Health script: `npm run healthcheck`
 
 ## Database
 The app writes insights to the `facebook_ad_insights` table. Connect using `PG_URI` and the script will create the table if needed.
@@ -150,10 +156,14 @@ npm run backfill 2024-01-01 2024-01-31
 
 ## Deployment to Render
 1. Push this repo to GitHub.
-2. In Render, create a **Background Worker** and connect it to your repo.
-3. Render reads `render.yaml` and the `Procfile` (`worker: node cron.js`) to build and start the service on Node 20.
-4. Set the required environment variables: `FB_ACCESS_TOKEN`, `FB_AD_ACCOUNTS`, `FB_APP_ID`, `FB_APP_SECRET`, `PG_URI`, `GOOGLE_SHEET_ID`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `SLACK_WEBHOOK_URL`, and optional `ERROR_ALERT_EMAIL`.
-5. Deploy; future commits to the `main` branch trigger automatic deploys.
+2. Render reads `render.yaml` to provision both a web service (`server.js`) and a background worker (`cron.js`).
+3. Set the required environment variables: `FB_ACCESS_TOKEN`, `FB_AD_ACCOUNTS`, `FB_APP_ID`, `FB_APP_SECRET`, `PG_URI`, `GOOGLE_SHEET_ID`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `SLACK_WEBHOOK_URL`, optional `ERROR_ALERT_EMAIL`, and `SYNC_API_KEY`.
+4. Deploy; future commits to the `main` branch trigger automatic deploys.
+
+## Health Endpoints
+
+- `GET /healthz` – returns `{ status: 'ok', db: 'ok'|'down', redis: 'ok'|'down', version }`.
+- `GET /readyz` – responds `200` only when the database is reachable and migrations have run.
 
 ## Token Rotation
 - Refresh the Facebook long-lived token every ~45 days:

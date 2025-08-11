@@ -1,12 +1,6 @@
 // Helper utilities for tracking sync completion times in Postgres
-import pkg from 'pg';
-import dotenv from 'dotenv';
+import { pool } from './lib/db.js';
 import { logError } from './logger.js';
-
-dotenv.config();
-
-const { Pool } = pkg;
-export const pool = new Pool({ connectionString: process.env.PG_URI });
 
 export async function ensureSyncLogTable() {
   const client = await pool.connect();

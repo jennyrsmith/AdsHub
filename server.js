@@ -13,13 +13,9 @@ import {
   saveYouTubeToDatabase,
   pushYouTubeToSheets,
 } from './youtubeInsights.js';
-import {
-  ensureSyncLogTable,
-  getLastSyncTimes,
-  upsertSyncLog,
-} from './syncLog.js';
+import { getLastSyncTimes, upsertSyncLog } from './syncLog.js';
 import { parseSort } from './sort.js';
-import { ensureIndexes } from './ensureIndexes.js';
+import { migrate } from './scripts/migrate.js';
 import { summaryCache } from './summaryCache.js';
 import { pool, queryWithRetry, closeDb } from './lib/db.js';
 import { connectRedis, redis, closeRedis } from './lib/redis.js';
@@ -41,11 +37,13 @@ function requireEnv(key) {
 requireEnv('PG_URI');
 requireEnv('SYNC_API_KEY');
 let migrationsApplied = false;
-Promise.all([ensureSyncLogTable(), ensureIndexes()])
-  .then(() => {
-    migrationsApplied = true;
-  })
-  .catch((err) => logError('init failed', err));
+try {
+  await migrate();
+  migrationsApplied = true;
+} catch (err) {
+  await logError('init failed', err);
+  process.exit(1);
+}
 connectRedis().catch((err) => logError('redis connect failed', err));
 
 const app = express();

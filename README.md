@@ -37,8 +37,48 @@ Shared modules live under `lib/` and are used by both processes.
    - Start web server: `npm run server`
    - Health script: `npm run healthcheck`
 
-## Database
-The app writes insights to the `facebook_ad_insights` table. Connect using `PG_URI` and the script will create the table if needed.
+## Database & Migrations
+Migrations live under `migrations/` and are plain SQL files prefixed with a UTC timestamp (e.g. `001_baseline.sql`).
+
+Run them locally with:
+
+```bash
+npm run migrate
+```
+
+Both `server.js` and `cron.js` apply pending migrations on startup so production instances stay up to date automatically.
+
+### Baseline schema
+`facebook_ad_insights` and `youtube_ad_insights` share the same columns:
+
+- `date_start` DATE
+- `account_id` TEXT
+- `campaign_id` TEXT
+- `campaign_name` TEXT
+- `adset_name` TEXT
+- `ad_name` TEXT
+- `impressions` INT
+- `clicks` INT
+- `spend` NUMERIC
+- `revenue` NUMERIC DEFAULT 0
+- `platform` TEXT
+
+Unique key:
+
+- `UNIQUE(platform, account_id, campaign_id, date_start)`
+
+Indexes:
+
+- `(date_start, platform)`
+- `(campaign_name)`
+- `(account_id)`
+
+`sync_log` tracks last successful sync:
+
+- `platform` TEXT PRIMARY KEY
+- `finished_at` TIMESTAMPTZ
+
+To add a new migration, create a new timestamped file in `migrations/`, then run `npm run migrate` to apply it.
 
 ## Google Sheets
 Place `credentials.json` for a service account in the project root. The sheet includes `Facebook Ads` and `YouTube Ads` tabs.
@@ -121,24 +161,6 @@ curl http://localhost:3005/api/last-sync
 ## Performance
 - Narrow date ranges when querying `/api/rows` or `/api/export.csv` for faster responses.
 - Large exports may take time to stream.
-
-### Suggested indexes
-Ensure these indexes exist for best performance. The `ensureIndexes.js` helper can create them or run the DDL manually:
-
-```sql
-CREATE INDEX IF NOT EXISTS facebook_ad_insights_date_start_platform_idx ON facebook_ad_insights(date_start, platform);
-CREATE INDEX IF NOT EXISTS facebook_ad_insights_campaign_name_idx ON facebook_ad_insights(campaign_name);
-CREATE INDEX IF NOT EXISTS facebook_ad_insights_account_id_idx ON facebook_ad_insights(account_id);
-CREATE INDEX IF NOT EXISTS youtube_ad_insights_date_start_platform_idx ON youtube_ad_insights(date_start, platform);
-CREATE INDEX IF NOT EXISTS youtube_ad_insights_campaign_name_idx ON youtube_ad_insights(campaign_name);
-CREATE INDEX IF NOT EXISTS youtube_ad_insights_account_id_idx ON youtube_ad_insights(account_id);
-```
-
-Run once:
-
-```bash
-node ensureIndexes.js
-```
 
 ### Query plan logging
 To inspect query plans locally, run:

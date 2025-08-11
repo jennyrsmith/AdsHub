@@ -14,7 +14,9 @@
     "ui": "npm --prefix ui start",
     "ui:build": "npm --prefix ui run build",
     "ui:lint": "cd ui && npm run lint",
-    "start:web": "npm --prefix ui run dev"
+    "start:web": "npm --prefix ui run dev",
+    "migrate": "node scripts/migrate.js",
+    "db:rebuild": "node scripts/migrate.js"
   },
   "dependencies": {
     "axios": "^1.6.7",

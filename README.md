@@ -109,6 +109,35 @@ Place `credentials.json` for a service account in the project root. The sheet in
 Set `SHEETS_ENABLED=false` to run without Google Sheets.
 To enable Sheets, provide `GOOGLE_SHEET_ID` and `GOOGLE_APPLICATION_CREDENTIALS` and set `SHEETS_ENABLED=true`.
 
+## Local Demo Mode
+
+Quickly explore the UI without real API credentials.
+
+### .env
+
+```
+DEMO_MODE=true
+SHEETS_ENABLED=false
+PG_URI=...
+SYNC_API_KEY=...
+```
+
+### Run
+
+```
+npm run migrate
+npm run demo:seed
+npm run dev:all
+```
+
+### Optional clean
+
+```
+npm run demo:clear
+```
+
+Demo rows use `account_id` like `act_demo_fb` / `act_demo_yt` and `campaign_id` prefixed `demo_` for safe deletion.
+
 ## Scheduling
 `cron.js` schedules:
 - Facebook & YouTube Sheets sync at 03:00, 09:00, 15:00, and 21:00 UTC-6 (America/Chicago)

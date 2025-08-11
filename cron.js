@@ -17,6 +17,7 @@ import { exec } from 'child_process';
 import util from 'util';
 import { closeDb } from './lib/db.js';
 import { connectRedis, closeRedis } from './lib/redis.js';
+import { migrate } from './scripts/migrate.js';
 
 dotenv.config();
 
@@ -33,13 +34,18 @@ function verifyCredentials() {
 }
 
 verifyCredentials();
+try {
+  await migrate();
+} catch (err) {
+  await logError('migration failed', err);
+  process.exit(1);
+}
 
 const timezone = 'America/Chicago';
 
 connectRedis().catch((err) => logError('redis connect failed', err));
 
 const jobs = [];
-
 jobs.push(
   cron.schedule(
     '0 3,9,15,21 * * *',

@@ -1,26 +1,25 @@
 {
   "name": "adshub-ui",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
   "type": "module",
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "preview": "vite preview --port 5173",
-  "start": "vite",
-  "lint": "eslint src --ext .jsx",
-},
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "start": "vite",
+    "lint": "eslint src --ext .jsx"
+  },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "react-day-picker": "^8.10.0",
-    "react-data-grid": "7.0.0-beta.15"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.10.3",
+    "react-data-grid": "^7.0.0-beta.43",
+    "react-day-picker": "^8.10.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.0",
-    "eslint": "^8.49.0",
-    "eslint-plugin-react": "^7.33.2"
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.7.0",
+    "vite": "^5.3.1"
   }
 }

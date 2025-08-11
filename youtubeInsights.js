@@ -4,7 +4,7 @@ import pkg from 'pg';
 import dotenv from 'dotenv';
 import { log, logError, timeUTC } from './logger.js';
 import { YOUTUBE_HEADERS, YOUTUBE_SHEET_NAME } from './constants.js';
-import { pushToGoogleSheets } from './pushToGoogleSheets.js';
+import { pushRowsToSheet } from './pushToGoogleSheets.js';
 
 dotenv.config();
 
@@ -19,7 +19,7 @@ export async function fetchYouTubeInsights() {
     throw new Error('Missing GOOGLE_ADS_DEVELOPER_TOKEN');
   }
   const auth = new google.auth.GoogleAuth({
-    keyFile: 'credentials.json',
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/adwords'],
   });
   const client = await auth.getClient();
@@ -103,5 +103,5 @@ export async function saveYouTubeToDatabase(insightsArray) {
 }
 
 export async function pushYouTubeToSheets(insightsArray) {
-  return pushToGoogleSheets(insightsArray, YOUTUBE_SHEET_NAME, YOUTUBE_HEADERS);
+  return pushRowsToSheet(insightsArray, YOUTUBE_SHEET_NAME, YOUTUBE_HEADERS);
 }

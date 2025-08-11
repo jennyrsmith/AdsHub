@@ -37,11 +37,13 @@ Create `/ui/.env.local` and set `VITE_SYNC_API_KEY` to enable authenticated acti
    FB_APP_SECRET=your_fb_app_secret
    PG_URI=postgres://user:pass@host/db
    GOOGLE_SHEET_ID=your_sheet_id
+   GOOGLE_APPLICATION_CREDENTIALS=credentials.json
    GOOGLE_ADS_CUSTOMER_ID=123-456-7890
    GOOGLE_ADS_DEVELOPER_TOKEN=your_google_ads_dev_token
    SLACK_WEBHOOK_URL=https://hooks.slack.com/... # optional
    ERROR_ALERT_EMAIL=alerts@example.com # optional
    SYNC_API_KEY=some-long-random-string
+   SHEETS_ENABLED=true
    ```
 
 3. **Run**
@@ -101,6 +103,11 @@ Nightly, the worker refreshes rollups for yesterday and the last 30‑day window
 
 ## Google Sheets
 Place `credentials.json` for a service account in the project root. The sheet includes `Facebook Ads` and `YouTube Ads` tabs.
+
+### Local dev
+
+Set `SHEETS_ENABLED=false` to run without Google Sheets.
+To enable Sheets, provide `GOOGLE_SHEET_ID` and `GOOGLE_APPLICATION_CREDENTIALS` and set `SHEETS_ENABLED=true`.
 
 ## Scheduling
 `cron.js` schedules:

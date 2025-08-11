@@ -8,6 +8,19 @@ It runs as two processes:
 - **Worker** – `cron.js` schedules recurring sync and reporting jobs.
 Shared modules live under `lib/` and are used by both processes.
 
+## Dashboard UI
+
+The dashboard provides a modern, Stripe-style overview of your ad performance.
+
+![Dashboard screenshot](docs/dashboard.png)
+
+### Commands
+
+- Development: `npm run ui`
+- Production preview: `npm run ui:build && npm run start:web`
+
+Create `/ui/.env.local` and set `VITE_SYNC_API_KEY` to enable authenticated actions in development.
+
 ## Setup
 
 1. **Install dependencies**

@@ -1,45 +1,28 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import FiltersBar from './FiltersBar.jsx';
-import ResultsGrid from './DataGrid.jsx';
+import { useEffect, useRef, useState } from 'react';
+import ResultsGrid, { allColumns } from './DataGrid.jsx';
+import { apiFetch } from '../lib/api.js';
+import { toast } from '../lib/toast.js';
 
-function defaultDates() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 6);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-}
-
-export default function TablePage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+export default function TablePage({ platform, start, end, q, sort, limit, offset, onChange }) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-
-  const defaults = defaultDates();
-  const platform = searchParams.get('platform') || 'all';
-  const start = searchParams.get('start') || defaults.start;
-  const end = searchParams.get('end') || defaults.end;
-  const q = searchParams.get('q') || '';
-  const sort = searchParams.get('sort') || '';
-  const limit = Number(searchParams.get('limit')) || 500;
-  const offset = Number(searchParams.get('offset')) || 0;
+  const [visibleCols, setVisibleCols] = useState(allColumns.map(c => c.key));
+  const [colOpen, setColOpen] = useState(false);
+  const searchRef = useRef();
 
   useEffect(() => {
-    const params = new URLSearchParams({ platform, start, end, limit, offset });
-    if (q) params.set('q', q);
-    if (sort) params.set('sort', sort);
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/rows?${params.toString()}`);
-        const data = await res.json();
-        setRows(data.rows || []);
-        setTotal(data.total || 0);
+        const params = new URLSearchParams({ platform, start, end, limit, offset });
+        if (q) params.set('q', q);
+        if (sort) params.set('sort', sort);
+        const res = await apiFetch(`/api/rows?${params.toString()}`);
+        setRows(res.rows || []);
+        setTotal(res.total || 0);
       } catch (err) {
-        console.error(err);
-        // simple alert for errors
-        alert('Failed to load data');
+        toast(err.message, 'error');
       } finally {
         setLoading(false);
       }
@@ -47,55 +30,69 @@ export default function TablePage() {
     load();
   }, [platform, start, end, q, sort, limit, offset]);
 
-  function updateParams(upd) {
-    const sp = new URLSearchParams(searchParams);
-    Object.entries(upd).forEach(([k, v]) => {
-      if (v === undefined || v === null || v === '') sp.delete(k);
-      else sp.set(k, String(v));
-    });
-    setSearchParams(sp);
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === '/' && searchRef.current) {
+        e.preventDefault();
+        searchRef.current.focus();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const debounced = useRef();
+  function handleSearch(e) {
+    const val = e.target.value;
+    clearTimeout(debounced.current);
+    debounced.current = setTimeout(() => onChange({ q: val, offset: 0 }), 300);
   }
 
-  function handleExport() {
-    const params = new URLSearchParams({ platform, start, end });
-    if (q) params.set('q', q);
-    if (sort) params.set('sort', sort);
-    const apiKey = import.meta.env.VITE_SYNC_API_KEY;
-    fetch(`/api/export.csv?${params.toString()}`, {
-      headers: { 'x-api-key': apiKey },
-    })
-      .then((res) => res.blob())
-      .then((blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'export.csv';
-        a.click();
-        window.URL.revokeObjectURL(url);
-      });
+  const cols = allColumns.filter(c => visibleCols.includes(c.key));
+
+  function toggleColumn(key) {
+    setVisibleCols(v => v.includes(key) ? v.filter(k => k !== key) : [...v, key]);
   }
 
   return (
-    <div>
-      <FiltersBar
-        platform={platform}
-        start={start}
-        end={end}
-        q={q}
-        onChange={updateParams}
-        onExport={handleExport}
-      />
-      <ResultsGrid
-        rows={rows}
-        total={total}
-        limit={limit}
-        offset={offset}
-        sort={sort}
-        onSort={(s) => updateParams({ sort: s })}
-        onPageChange={(off) => updateParams({ offset: off })}
-        onLimitChange={(l) => updateParams({ limit: l, offset: 0 })}
-        loading={loading}
-      />
-    </div>
+    <section style={{ marginTop: 'var(--space-xl)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+        <h2 style={{ margin: 0 }}>Performance Rows</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+          <input ref={searchRef} placeholder="Search" defaultValue={q} onChange={handleSearch} style={{ padding: 'var(--space-sm)' }} />
+          <select value={limit} onChange={(e) => onChange({ limit: Number(e.target.value), offset: 0 })}>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={500}>500</option>
+          </select>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setColOpen(o => !o)}>Columns ▾</button>
+            {colOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '100%', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: 'var(--space-sm)', zIndex: 5 }}>
+                {allColumns.map(col => (
+                  <label key={col.key} style={{ display: 'block' }}>
+                    <input type="checkbox" checked={visibleCols.includes(col.key)} onChange={() => toggleColumn(col.key)} /> {col.name}
+                  </label>
+                ))}
+                <button onClick={() => setVisibleCols(allColumns.map(c => c.key))}>Reset view</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {loading && rows.length === 0 ? (
+        <div style={{ height: 200, background: 'var(--color-bg-alt)', borderRadius: 'var(--radius-md)' }} />
+      ) : rows.length === 0 ? (
+        <div>No data</div>
+      ) : (
+        <ResultsGrid rows={rows} sort={sort} onSort={(s) => onChange({ sort: s, offset: 0 })} columns={cols} />
+      )}
+      <div style={{ marginTop: 'var(--space-sm)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+        <span>Showing {rows.length} of {total}</span>
+        <button disabled={offset === 0} onClick={() => onChange({ offset: Math.max(0, offset - limit) })}>Prev</button>
+        <button disabled={offset + limit >= total} onClick={() => onChange({ offset: offset + limit })}>Next</button>
+        {loading && <span>Loading...</span>}
+      </div>
+    </section>
   );
 }

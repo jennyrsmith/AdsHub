@@ -117,10 +117,29 @@ curl http://localhost:3005/api/last-sync
 - Large exports may take time to stream.
 
 ### Suggested indexes
-Add these indexes to PostgreSQL for best performance:
-- `(date_start, platform)`
-- `(campaign_name)`
-- `(account_id)`
+Ensure these indexes exist for best performance. The `ensureIndexes.js` helper can create them or run the DDL manually:
+
+```sql
+CREATE INDEX IF NOT EXISTS facebook_ad_insights_date_start_platform_idx ON facebook_ad_insights(date_start, platform);
+CREATE INDEX IF NOT EXISTS facebook_ad_insights_campaign_name_idx ON facebook_ad_insights(campaign_name);
+CREATE INDEX IF NOT EXISTS facebook_ad_insights_account_id_idx ON facebook_ad_insights(account_id);
+CREATE INDEX IF NOT EXISTS youtube_ad_insights_date_start_platform_idx ON youtube_ad_insights(date_start, platform);
+CREATE INDEX IF NOT EXISTS youtube_ad_insights_campaign_name_idx ON youtube_ad_insights(campaign_name);
+CREATE INDEX IF NOT EXISTS youtube_ad_insights_account_id_idx ON youtube_ad_insights(account_id);
+```
+
+Run once:
+
+```bash
+node ensureIndexes.js
+```
+
+### Query plan logging
+To inspect query plans locally, run:
+
+```bash
+node planLogger.js
+```
 
 ## Backfill
 Run historical pulls between two dates:

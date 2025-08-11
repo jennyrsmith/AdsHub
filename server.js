@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DateTime } from 'luxon';
+import Cursor from 'pg-cursor';
 import { log, logError } from './logger.js';
 import { fetchFacebookInsights } from './facebookInsights.js';
 import { saveToDatabase } from './saveToDatabase.js';
@@ -18,7 +19,7 @@ import {
   upsertSyncLog,
   pool,
 } from './syncLog.js';
-import { HEADERS, YOUTUBE_HEADERS } from './constants.js';
+import { parseSort } from './sort.js';
 
 dotenv.config();
 
@@ -53,6 +54,60 @@ const REQUIRE_KEY_PUBLIC = process.env.REQUIRE_KEY_PUBLIC === 'true';
 function maybeAuth(req, res, next) {
   if (REQUIRE_KEY_PUBLIC) return checkApiKey(req, res, next);
   return next();
+}
+
+// helper to construct union queries for facebook/youtube tables
+function buildUnionQuery({ platform, start, end, q }) {
+  const params = [start, end];
+  let qIndex = null;
+  if (q) {
+    params.push(`%${q}%`);
+    qIndex = params.length; // 1-based index after push
+  }
+
+  const fbWhere = ["date_start >= $1", "date_start <= $2"];
+  const ytWhere = ["date_start >= $1", "date_start <= $2"];
+  if (qIndex) {
+    fbWhere.push(
+      `(campaign_name ILIKE $${qIndex} OR adset_name ILIKE $${qIndex} OR ad_name ILIKE $${qIndex})`
+    );
+    ytWhere.push(`campaign_name ILIKE $${qIndex}`);
+  }
+
+  const fbSelect = `SELECT date_start, 'facebook' AS platform, account_id, NULL::text AS campaign_id, campaign_name, adset_name, ad_name, impressions, clicks, spend, COALESCE(purchase_roas * spend,0)::numeric AS revenue, CASE WHEN spend > 0 THEN COALESCE(purchase_roas * spend,0)/spend ELSE NULL END AS roas FROM facebook_ad_insights WHERE ${fbWhere.join(
+    ' AND '
+  )}`;
+
+  const ytSelect = `SELECT date_start, 'youtube' AS platform, NULL::text AS account_id, NULL::text AS campaign_id, campaign_name, NULL::text AS adset_name, NULL::text AS ad_name, impressions, clicks, cost AS spend, 0::numeric AS revenue, CASE WHEN cost > 0 THEN 0 ELSE NULL END AS roas FROM youtube_ad_insights WHERE ${ytWhere.join(
+    ' AND '
+  )}`;
+
+  let unionSql;
+  if (platform === 'facebook') unionSql = fbSelect;
+  else if (platform === 'youtube') unionSql = ytSelect;
+  else unionSql = `${fbSelect} UNION ALL ${ytSelect}`;
+
+  return { unionSql, params };
+}
+
+// simple in-memory rate limiter for CSV exports
+const exportCounts = new Map();
+function rateLimitExport(req, res, next) {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const limit = 5;
+  const ip = req.ip || req.connection.remoteAddress;
+  const info = exportCounts.get(ip) || { count: 0, start: now };
+  if (now - info.start > windowMs) {
+    info.count = 0;
+    info.start = now;
+  }
+  info.count += 1;
+  exportCounts.set(ip, info);
+  if (info.count > limit) {
+    return res.status(429).json({ error: 'Too many export requests' });
+  }
+  next();
 }
 
 app.get('/api/last-sync', maybeAuth, async (req, res, next) => {
@@ -146,55 +201,96 @@ app.get('/api/summary', maybeAuth, async (req, res, next) => {
   }
 });
 
-app.get('/api/export.csv', checkApiKey, async (req, res) => {
-  const { platform = 'all', start, end } = req.query;
+app.get('/api/rows', maybeAuth, async (req, res, next) => {
+  const {
+    platform = 'all',
+    start,
+    end,
+    q,
+    sort,
+    limit = 500,
+    offset = 0,
+  } = req.query;
+  if (!start || !end) return res.status(400).json({ error: 'start and end required' });
+  if (!['facebook', 'youtube', 'all'].includes(platform))
+    return res.status(400).json({ error: 'invalid platform' });
+  const lim = Math.min(Number(limit) || 500, 2000);
+  const off = Number(offset) || 0;
+  try {
+    const { unionSql, params } = buildUnionQuery({ platform, start, end, q });
+    const orderClause = parseSort(sort);
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM (${unionSql}) AS sub`,
+      params
+    );
+    const idx = params.length + 1;
+    const rowsSql = `SELECT * FROM (${unionSql}) AS sub ${orderClause} LIMIT $${idx} OFFSET $${idx + 1}`;
+    const rowsRes = await pool.query(rowsSql, [...params, lim, off]);
+    res.json({ rows: rowsRes.rows, total: Number(countRes.rows[0].count) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/export.csv', checkApiKey, rateLimitExport, async (req, res) => {
+  const { platform = 'all', start, end, q, sort } = req.query;
   if (!start || !end) {
     return res.status(400).json({ error: 'start and end required' });
   }
   if (!['facebook', 'youtube', 'all'].includes(platform)) {
     return res.status(400).json({ error: 'invalid platform' });
   }
+
+  const headers = [
+    'date_start',
+    'platform',
+    'account_id',
+    'campaign_id',
+    'campaign_name',
+    'adset_name',
+    'ad_name',
+    'impressions',
+    'clicks',
+    'spend',
+    'revenue',
+    'roas',
+  ];
+
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="export.csv"');
-  const batchSize = 1000;
-  const ALL_HEADERS = ['platform', ...new Set([...HEADERS, ...YOUTUBE_HEADERS])];
-
-  async function streamRows(p, headers, table) {
-    let offset = 0;
-    const selectCols = headers.join(', ');
-    while (true) {
-      const { rows } = await pool.query(
-        `SELECT ${selectCols} FROM ${table} WHERE date_start >= $1 AND date_start <= $2 ORDER BY date_start LIMIT $3 OFFSET $4`,
-        [start, end, batchSize, offset]
-      );
-      if (rows.length === 0) break;
-      for (const row of rows) {
-        let values;
-        if (platform === 'all') {
-          const data = { platform: p, ...row };
-          values = ALL_HEADERS.map((h) => data[h] ?? '');
-        } else {
-          values = headers.map((h) => row[h] ?? '');
-        }
-        res.write(values.join(',') + '\n');
-      }
-      offset += rows.length;
-    }
-  }
-
   try {
-    if (platform === 'facebook') {
-      res.write(HEADERS.join(',') + '\n');
-      await streamRows('facebook', HEADERS, 'facebook_ad_insights');
-    } else if (platform === 'youtube') {
-      res.write(YOUTUBE_HEADERS.join(',') + '\n');
-      await streamRows('youtube', YOUTUBE_HEADERS, 'youtube_ad_insights');
-    } else {
-      res.write(ALL_HEADERS.join(',') + '\n');
-      await streamRows('facebook', HEADERS, 'facebook_ad_insights');
-      await streamRows('youtube', YOUTUBE_HEADERS, 'youtube_ad_insights');
+    const { unionSql, params } = buildUnionQuery({ platform, start, end, q });
+    const orderClause = parseSort(sort);
+    const client = await pool.connect();
+    try {
+      const cursor = client.query(new Cursor(`${unionSql} ${orderClause}`, params));
+      res.write(headers.join(',') + '\n');
+      function read() {
+        cursor.read(1000, async (err, rows) => {
+          if (err) {
+            await logError('export.csv cursor error', err);
+            cursor.close(() => client.release());
+            return res.end();
+          }
+          if (!rows.length) {
+            cursor.close(() => {
+              client.release();
+              res.end();
+            });
+            return;
+          }
+          for (const row of rows) {
+            const values = headers.map((h) => row[h] ?? '');
+            res.write(values.join(',') + '\n');
+          }
+          read();
+        });
+      }
+      read();
+    } catch (err) {
+      client.release();
+      throw err;
     }
-    res.end();
   } catch (err) {
     await logError('export.csv failed', err);
     res.status(500).end();

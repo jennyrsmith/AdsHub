@@ -7,7 +7,7 @@ import Cursor from 'pg-cursor';
 import { log, logError } from './logger.js';
 import { fetchFacebookInsights } from './facebookInsights.js';
 import { saveToDatabase } from './saveToDatabase.js';
-import { pushToGoogleSheets } from './pushToGoogleSheets.js';
+import { pushRowsToSheet } from './pushToGoogleSheets.js';
 import {
   fetchYouTubeInsights,
   saveYouTubeToDatabase,
@@ -168,7 +168,7 @@ app.post('/api/sync', checkApiKey, async (req, res) => {
       if (p === 'facebook') {
         const data = await fetchFacebookInsights();
         await saveToDatabase(data);
-        await pushToGoogleSheets(data);
+        await pushRowsToSheet(data);
         await upsertSyncLog('facebook', new Date());
         recordsSynced += data.length;
       } else if (p === 'youtube') {

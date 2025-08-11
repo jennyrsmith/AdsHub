@@ -7,6 +7,14 @@ import { log, logError } from './logger.js';
 dotenv.config();
 
 const { Pool } = pkg;
+const SHEETS_ENABLED = process.env.SHEETS_ENABLED !== 'false';
+
+function warnOnce() {
+  if (!globalThis.__sheetsWarned) {
+    console.warn('Sheets disabled; skipping Google Sheets initialization.');
+    globalThis.__sheetsWarned = true;
+  }
+}
 
 async function run() {
   let exitCode = 0;
@@ -14,8 +22,13 @@ async function run() {
     if (!process.env.PG_URI) {
       throw new Error('Missing PG_URI');
     }
-    if (!process.env.GOOGLE_SHEET_ID || !fs.existsSync('credentials.json')) {
-      throw new Error('Missing Google Sheets credentials');
+    if (SHEETS_ENABLED) {
+      const creds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      if (!process.env.GOOGLE_SHEET_ID || !creds || !fs.existsSync(creds)) {
+        throw new Error('Missing Google Sheets credentials');
+      }
+    } else {
+      warnOnce();
     }
     const pool = new Pool({ connectionString: process.env.PG_URI });
     const client = await pool.connect();
@@ -42,29 +55,31 @@ async function run() {
     await logError('Healthcheck database query failed', err);
   }
 
-  try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: 'credentials.json',
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'https://www.googleapis.com/auth/drive.metadata.readonly',
-      ],
-    });
-    const client = await auth.getClient();
-    const drive = google.drive({ version: 'v3', auth: client });
-    const file = await drive.files.get({
-      fileId: process.env.GOOGLE_SHEET_ID,
-      fields: 'modifiedTime',
-    });
-    const modified = file.data.modifiedTime;
-    log(`Google Sheet last modified: ${modified}`);
-    if (!modified || new Date(modified) < Date.now() - 24 * 60 * 60 * 1000) {
-      log('Google Sheets sync is older than 24 hours');
+  if (SHEETS_ENABLED) {
+    try {
+      const auth = new google.auth.GoogleAuth({
+        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        scopes: [
+          'https://www.googleapis.com/auth/spreadsheets.readonly',
+          'https://www.googleapis.com/auth/drive.metadata.readonly',
+        ],
+      });
+      const client = await auth.getClient();
+      const drive = google.drive({ version: 'v3', auth: client });
+      const file = await drive.files.get({
+        fileId: process.env.GOOGLE_SHEET_ID,
+        fields: 'modifiedTime',
+      });
+      const modified = file.data.modifiedTime;
+      log(`Google Sheet last modified: ${modified}`);
+      if (!modified || new Date(modified) < Date.now() - 24 * 60 * 60 * 1000) {
+        log('Google Sheets sync is older than 24 hours');
+        exitCode = 1;
+      }
+    } catch (err) {
       exitCode = 1;
+      await logError('Healthcheck Google Sheets check failed', err);
     }
-  } catch (err) {
-    exitCode = 1;
-    await logError('Healthcheck Google Sheets check failed', err);
   }
 
   process.exit(exitCode);

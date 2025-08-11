@@ -223,3 +223,22 @@ npm run rollup:backfill
 - Rotate your Facebook App Secret regularly and generate a new long-lived `FB_ACCESS_TOKEN`.
 - `.env` and `credentials.json` are excluded from git via `.gitignore`.
 - When persistent failures occur the logger will note `Would send email to ...` using `ERROR_ALERT_EMAIL`.
+
+## Local Dev End-to-End
+- Backend:
+  npm run migrate
+  npm start   # http://localhost:3000/readyz should return 200
+- Frontend:
+  Create /ui/.env.local with:
+    VITE_API_BASE=
+    VITE_SYNC_API_KEY=<same value as SYNC_API_KEY in root .env>
+  Then:
+    npm --prefix ui install
+    npm run ui   # Opens http://localhost:5173 (or 5174)
+- Verify:
+  curl -s "http://localhost:3000/api/summary?range=7" -H "x-api-key: $SYNC_API_KEY"
+  curl -s "http://localhost:3000/api/rows?start=2025-08-05&end=2025-08-11&limit=5" -H "x-api-key: $SYNC_API_KEY"
+- Troubleshooting:
+  401/403 → bad/missing x-api-key
+  500 → backend exception (check server logs)
+  Network errors → backend not running or proxy misconfigured

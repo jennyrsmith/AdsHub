@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { apiFetch } from '../lib/api.js';
-import { toast } from '../lib/toast.js';
+import { showToast } from '../lib/toast.js';
 import { formatCurrency, formatNumber } from '../lib/format.js';
 
 export default function ChannelChart({ start, end }) {
@@ -16,7 +16,8 @@ export default function ChannelChart({ start, end }) {
         const res = await apiFetch(`/api/summary?${params.toString()}`);
         setData(Array.isArray(res) ? res : []);
       } catch (err) {
-        toast(err.message, 'error');
+        console.error(err);
+        showToast('Failed to load data');
       } finally {
         setLoading(false);
       }

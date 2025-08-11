@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api.js';
 import { formatCurrency, formatNumber } from '../lib/format.js';
-import { toast } from '../lib/toast.js';
+import { showToast } from '../lib/toast.js';
 
 const fields = [
   { key: 'spend', label: 'Spend', format: formatCurrency },
@@ -39,7 +39,8 @@ export default function KPICards({ platform, start, end }) {
         }
         setData(obj);
       } catch (err) {
-        toast(err.message, 'error');
+        console.error(err);
+        showToast('Failed to load data');
       } finally {
         setLoading(false);
       }

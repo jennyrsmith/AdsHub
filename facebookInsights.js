@@ -76,6 +76,10 @@ export async function fetchInsightsForAccount(accountId, date, accessToken) {
  */
 export async function fetchFacebookInsights() {
   log(`Fetching Facebook insights at ${timeUTC()}`);
+  if (process.env.DEMO_MODE === 'true') {
+    console.log('DEMO_MODE: skipping external fetch');
+    return [];
+  }
   try {
     const accessToken = process.env.FB_ACCESS_TOKEN;
     const accountEnv = process.env.FB_AD_ACCOUNTS;

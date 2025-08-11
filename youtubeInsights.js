@@ -12,6 +12,10 @@ const { Pool } = pkg;
 const pool = new Pool({ connectionString: process.env.PG_URI });
 
 export async function fetchYouTubeInsights() {
+  if (process.env.DEMO_MODE === 'true') {
+    console.log('DEMO_MODE: skipping external fetch');
+    return [];
+  }
   if (!process.env.GOOGLE_ADS_CUSTOMER_ID) {
     throw new Error('Missing GOOGLE_ADS_CUSTOMER_ID');
   }

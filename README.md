@@ -80,6 +80,12 @@ Indexes:
 
 To add a new migration, create a new timestamped file in `migrations/`, then run `npm run migrate` to apply it.
 
+### Daily rollups
+
+`daily_rollup` stores aggregated spend, revenue, impressions, and clicks per platform per day. It has primary key `(platform, date)` and an index on `date` for range queries. A materialized view `mv_summary_30d` pre-aggregates totals for the last 30 days.
+
+Nightly, the worker refreshes rollups for yesterday and the last 30‑day window and then refreshes the materialized view. The `/api/summary` endpoint uses these rollups for 7‑ and 30‑day ranges by default.
+
 ## Google Sheets
 Place `credentials.json` for a service account in the project root. The sheet includes `Facebook Ads` and `YouTube Ads` tabs.
 
@@ -126,8 +132,8 @@ curl -X POST http://localhost:3005/api/sync \
   -d '{"platform":"facebook"}'
 ```
 
-### GET `/api/summary?range=7|30`
-Returns spend, impressions, clicks, and ROAS for the last N days by platform.
+### GET `/api/summary?range=7|30&source=raw|rollup|auto`
+Returns spend, impressions, clicks, and ROAS for the last N days by platform. For 7- and 30-day ranges, rollups are used by default (`source=auto`). Set `source=raw` to force scanning raw tables or `source=rollup` to bypass the fallback logic.
 
 ### GET `/api/rows`
 Query params:
@@ -174,6 +180,12 @@ Run historical pulls between two dates:
 
 ```
 npm run backfill 2024-01-01 2024-01-31
+```
+
+Populate daily rollups over a range:
+
+```
+npm run rollup:backfill
 ```
 
 ## Deployment to Render

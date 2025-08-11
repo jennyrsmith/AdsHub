@@ -17,16 +17,20 @@ import {
   ensureSyncLogTable,
   getLastSyncTimes,
   upsertSyncLog,
-  pool,
 } from './syncLog.js';
 import { parseSort } from './sort.js';
 import { ensureIndexes } from './ensureIndexes.js';
 import { summaryCache } from './summaryCache.js';
-import { queryWithRetry } from './db.js';
+import { pool, queryWithRetry, closeDb } from './lib/db.js';
+import { connectRedis, redis, closeRedis } from './lib/redis.js';
+import { createRequire } from 'module';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const require = createRequire(import.meta.url);
+const { version } = require('./package.json');
 
 function requireEnv(key) {
   if (!process.env[key]) {
@@ -36,8 +40,13 @@ function requireEnv(key) {
 
 requireEnv('PG_URI');
 requireEnv('SYNC_API_KEY');
-ensureSyncLogTable().catch((err) => logError('sync_log init failed', err));
-ensureIndexes().catch((err) => logError('index init failed', err));
+let migrationsApplied = false;
+Promise.all([ensureSyncLogTable(), ensureIndexes()])
+  .then(() => {
+    migrationsApplied = true;
+  })
+  .catch((err) => logError('init failed', err));
+connectRedis().catch((err) => logError('redis connect failed', err));
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -59,6 +68,31 @@ function maybeAuth(req, res, next) {
   if (REQUIRE_KEY_PUBLIC) return checkApiKey(req, res, next);
   return next();
 }
+
+app.get('/healthz', async (req, res) => {
+  const status = { status: 'ok', db: 'down', redis: 'down', version };
+  try {
+    await pool.query('SELECT 1');
+    status.db = 'ok';
+  } catch {}
+  try {
+    if (redis) {
+      await redis.ping();
+      status.redis = 'ok';
+    }
+  } catch {}
+  res.json(status);
+});
+
+app.get('/readyz', async (req, res) => {
+  if (!migrationsApplied) return res.status(503).end();
+  try {
+    await pool.query('SELECT 1');
+    return res.status(200).json({ status: 'ok' });
+  } catch {
+    return res.status(503).end();
+  }
+});
 
 // helper to construct union queries for facebook/youtube tables
 function buildUnionQuery({ platform, start, end, q }) {
@@ -320,6 +354,17 @@ app.use(async (err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   log(`Server listening on ${PORT}`);
 });
+
+function shutdown() {
+  log('Shutting down');
+  server.close(async () => {
+    await closeDb().catch((err) => logError('db close failed', err));
+    await closeRedis().catch((err) => logError('redis close failed', err));
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', shutdown);

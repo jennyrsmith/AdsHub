@@ -1,4 +1,4 @@
-import { pool } from './syncLog.js';
+import { pool } from './lib/db.js';
 import { log } from './logger.js';
 
 export async function logPlans() {

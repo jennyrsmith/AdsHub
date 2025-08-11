@@ -1,4 +1,4 @@
-import { pool } from './syncLog.js';
+import { pool } from './lib/db.js';
 
 const statements = [
   `CREATE INDEX IF NOT EXISTS facebook_ad_insights_date_start_platform_idx ON facebook_ad_insights(date_start, platform)`,

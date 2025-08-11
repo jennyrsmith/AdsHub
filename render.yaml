@@ -1,12 +1,5 @@
-services:
-  - type: worker
-    name: fb-ads-worker
-    env: node
-    nodeVersion: 20
-    branch: main
-    autoDeploy: true
-    buildCommand: "npm install"
-    startCommand: "node cron.js"
+envVarGroups:
+  - name: adshub-env
     envVars:
       - key: FB_ACCESS_TOKEN
         value: ""
@@ -28,3 +21,29 @@ services:
         value: ""
       - key: ERROR_ALERT_EMAIL
         value: ""
+      - key: SYNC_API_KEY
+        value: ""
+      - key: REDIS_URL
+        value: ""
+
+services:
+  - type: web
+    name: fb-ads-web
+    env: node
+    nodeVersion: 20
+    branch: main
+    autoDeploy: true
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    envVars:
+      - fromGroup: adshub-env
+  - type: worker
+    name: fb-ads-worker
+    env: node
+    nodeVersion: 20
+    branch: main
+    autoDeploy: true
+    buildCommand: "npm install"
+    startCommand: "node cron.js"
+    envVars:
+      - fromGroup: adshub-env

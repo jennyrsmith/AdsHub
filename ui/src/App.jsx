@@ -1,4 +1,3 @@
-import { BrowserRouter, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import Layout from './components/Layout.jsx';
 import Header from './components/Header.jsx';
@@ -7,8 +6,23 @@ import KPICards from './components/KPICards.jsx';
 import ChannelChart from './components/ChannelChart.jsx';
 import TablePage from './components/TablePage.jsx';
 
+function useQueryParams() {
+  const [sp, setSp] = useState(() => new URLSearchParams(window.location.search));
+  const update = (upd) => {
+    const next = new URLSearchParams(sp.toString());
+    Object.entries(upd).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === '') next.delete(k);
+      else next.set(k, String(v));
+    });
+    const qs = next.toString();
+    window.history.pushState({}, '', qs ? `?${qs}` : window.location.pathname);
+    setSp(next);
+  };
+  return [sp, update];
+}
+
 function Dashboard() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useQueryParams();
   const [syncing, setSyncing] = useState(false);
 
   const brand = import.meta.env.VITE_BRAND_NAME || 'AdsHub';
@@ -29,12 +43,7 @@ function Dashboard() {
   const offset = Number(searchParams.get('offset')) || 0;
 
   function updateParams(upd) {
-    const sp = new URLSearchParams(searchParams);
-    Object.entries(upd).forEach(([k,v]) => {
-      if (v === undefined || v === null || v === '') sp.delete(k);
-      else sp.set(k, String(v));
-    });
-    setSearchParams(sp);
+    setSearchParams(upd);
   }
 
   return (
@@ -60,9 +69,5 @@ function Dashboard() {
 }
 
 export default function App() {
-  return (
-    <BrowserRouter>
-      <Dashboard />
-    </BrowserRouter>
-  );
+  return <Dashboard />;
 }

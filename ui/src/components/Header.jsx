@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { apiFetch } from '../lib/api.js';
-import { toast } from '../lib/toast.js';
+import { showToast } from '../lib/toast.js';
 import 'react-day-picker/dist/style.css';
 
 function formatDate(d) {
@@ -24,9 +24,10 @@ export default function Header({ brand, platform, start, end, onChange, onSyncSt
     try {
       onSyncStart?.();
       await apiFetch('/api/sync', { method: 'POST', body: { target } });
-      toast('Sync started');
+      showToast('Sync started', 'success');
     } catch (err) {
-      toast(err.message, 'error');
+      console.error(err);
+      showToast('Failed to load data');
     } finally {
       onSyncEnd?.();
       setOpen(false);

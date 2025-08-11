@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api.js';
-import { toast } from '../lib/toast.js';
+import { showToast } from '../lib/toast.js';
 
 export default function StatusBar({ platform, start, end, q, sort }) {
   const [syncs, setSyncs] = useState({});
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    apiFetch('/api/last-sync').then(setSyncs).catch((e) => toast(e.message, 'error'));
+    async function load() {
+      try {
+        const data = await apiFetch('/api/last-sync');
+        setSyncs(data);
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to load data');
+      }
+    }
+    load();
   }, []);
 
   function format(ts) {
@@ -21,8 +30,8 @@ export default function StatusBar({ platform, start, end, q, sort }) {
       const params = new URLSearchParams({ platform, start, end });
       if (q) params.set('q', q);
       if (sort) params.set('sort', sort);
-      const res = await apiFetch(`/api/export.csv?${params.toString()}`);
-      const blob = await res.blob();
+      const csv = await apiFetch(`/api/export.csv?${params.toString()}`);
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -30,7 +39,8 @@ export default function StatusBar({ platform, start, end, q, sort }) {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      toast(err.message, 'error');
+      console.error(err);
+      showToast('Failed to export data');
     } finally {
       setExporting(false);
     }

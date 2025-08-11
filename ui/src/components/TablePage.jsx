@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ResultsGrid, { allColumns } from './DataGrid.jsx';
 import { apiFetch } from '../lib/api.js';
-import { toast } from '../lib/toast.js';
+import { showToast } from '../lib/toast.js';
 
 export default function TablePage({ platform, start, end, q, sort, limit, offset, onChange }) {
   const [rows, setRows] = useState([]);
@@ -22,7 +22,8 @@ export default function TablePage({ platform, start, end, q, sort, limit, offset
         setRows(res.rows || []);
         setTotal(res.total || 0);
       } catch (err) {
-        toast(err.message, 'error');
+        console.error(err);
+        showToast('Failed to load data');
       } finally {
         setLoading(false);
       }

@@ -83,14 +83,44 @@ curl -X POST http://localhost:3005/api/sync \
 ### GET `/api/summary?range=7|30`
 Returns spend, impressions, clicks, and ROAS for the last N days by platform.
 
-### GET `/api/export.csv?platform=facebook|youtube|all&start=YYYY-MM-DD&end=YYYY-MM-DD`
-Protected by `x-api-key`. Streams a CSV of raw records for the requested platform and date range.
+### GET `/api/rows`
+Query params:
+
+| param | description |
+|-------|-------------|
+| `platform` | `facebook`, `youtube` or `all` (default) |
+| `start` | start date `YYYY-MM-DD` (required) |
+| `end` | end date `YYYY-MM-DD` (required) |
+| `q` | optional text search across campaign/adset/ad name |
+| `sort` | `field:asc|desc` where field in `date_start, spend, clicks, impressions, roas, campaign_name` |
+| `limit` | max rows per page (default 500, max 2000) |
+| `offset` | pagination offset (default 0) |
+
+Returns `{"rows": [...], "total": number}` with a combined view of Facebook and YouTube records.
+
+### GET `/api/export.csv`
+Same filters as `/api/rows` and protected by header `x-api-key: SYNC_API_KEY`.
+Streams a CSV with columns:
+
+`date_start, platform, account_id, campaign_id, campaign_name, adset_name, ad_name, impressions, clicks, spend, revenue, roas`
+
+Exports are rate limited to 5 requests per minute per IP.
 
 Fetch last sync example:
 
 ```bash
 curl http://localhost:3005/api/last-sync
 ```
+
+## Performance
+- Narrow date ranges when querying `/api/rows` or `/api/export.csv` for faster responses.
+- Large exports may take time to stream.
+
+### Suggested indexes
+Add these indexes to PostgreSQL for best performance:
+- `(date_start, platform)`
+- `(campaign_name)`
+- `(account_id)`
 
 ## Backfill
 Run historical pulls between two dates:

@@ -43,10 +43,4 @@ async function migrate() {
 
 migrate()
   .then(async () => { console.log('[migrate] Complete'); await pool.end(); })
-  .catch(async (err) => {
-    if (err?.errors && Array.isArray(err.errors)) {
-      err.errors.forEach((e,i)=>console.error(`Aggregate suberror ${i+1}:`, e));
-    }
-    await pool.end().catch(()=>{});
-    process.exit(1);
-  });
+  .catch(async () => { await pool.end().catch(() => {}); process.exit(1); });

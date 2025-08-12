@@ -6,12 +6,15 @@ import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
 import { finalizeYesterdayIfNeeded, pullToday } from './cronHelpers.js';
 import { runDailyCreativeRecs } from './dailyCreative.js';
 import { getDashboardLastSync } from './syncState.js';
+import googleAuthRoutes from "./routes/googleAuthRoutes.js";
 
 dotenv.config();
 await migrate();
 
 const app = express();
 app.use(express.json());
+
+app.use("/api", googleAuthRoutes);
 
 function requireKey(req,res,next){
   const k = req.headers['x-api-key'];

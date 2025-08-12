@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import os from 'node:os';
-import { pool, ping } from './db.js';
+import { pool } from './lib/db.js';
 import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
 import { finalizeYesterdayIfNeeded, pullToday } from './cronHelpers.js';
 import { runDailyCreativeRecs } from './dailyCreative.js';
@@ -40,13 +40,12 @@ app.get('/healthz', (req, res) => {
   });
 });
 
-app.get('/readyz', async (req, res) => {
+app.get('/readyz', async (_req, res) => {
   try {
-    const ok = await ping();
-    if (ok) return res.status(200).json({ ok: true });
-    return res.status(500).json({ ok: false, reason: 'db-ping-failed' });
+    await pool.query('SELECT 1');
+    return res.status(200).json({ ok: true });
   } catch (e) {
-    return res.status(500).json({ ok: false, reason: 'db-error', error: e.message });
+    return res.status(503).json({ ok: false, reason: 'db-error', error: e.message });
   }
 });
 
@@ -80,7 +79,8 @@ app.post('/api/sync', async (req, res) => {
 app.listen(PORT, HOST, () => {
   const dbHost = (() => {
     try {
-      const u = new URL(process.env.PG_URI);
+      const conn = process.env.DATABASE_URL || process.env.PG_URI;
+      const u = new URL(conn);
       return u.hostname + ':' + (u.port || '5432');
     } catch {
       return 'unknown';
@@ -89,7 +89,7 @@ app.listen(PORT, HOST, () => {
   console.log(
     `[start] adshub-api v${VERSION} listening on http://${HOST}:${PORT} (${process.env.NODE_ENV || 'dev'})`
   );
-  console.log(`[config] DB host=${dbHost} sheetsEnabled=${SHEETS_ENABLED} pg_ssl_ca=${process.env.PG_SSL_CA || '(none)'}`);
+  console.log(`[config] DB host=${dbHost} sheetsEnabled=${SHEETS_ENABLED} pg_ca=${process.env.PG_CA_PATH || '(none)'}`);
 });
 
 export default app;

@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { pool } from '../db.js';
+import { pool } from '../lib/db.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';

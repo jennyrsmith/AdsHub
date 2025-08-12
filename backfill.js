@@ -1,7 +1,7 @@
 // backfill.js
 import { DateTime } from "luxon";
 import { fetchFacebookInsights } from "./facebookInsights.js";
-import { fetchYoutubeInsights } from "./youtubeInsights.js";
+import { fetchYouTubeInsights } from "./youtubeInsights.js";
 import { insertOnly } from "./saveToDatabase.js";
 import { logSync } from "./syncLog.js";
 
@@ -19,7 +19,7 @@ async function backfillPlatform(name, fetcher) {
     const winStart = s.toISODate();
     const winEnd = (e > end ? end : e).toISODate();
 
-    const rows = await fetcher({ since: winStart, until: winEnd, mode: "history" });
+    const rows = await fetcher({ since: winStart, until: winEnd });
     const r = await insertOnly(name, rows);
     await logSync(`${name}_history_chunk`, { winStart, winEnd, rows: rows.length, inserted: r.inserted });
 
@@ -29,7 +29,7 @@ async function backfillPlatform(name, fetcher) {
 
 (async () => {
   await backfillPlatform("facebook", fetchFacebookInsights);
-  await backfillPlatform("youtube", fetchYoutubeInsights);
+  await backfillPlatform("youtube", fetchYouTubeInsights);
   console.log("Backfill complete.");
   process.exit(0);
 })();

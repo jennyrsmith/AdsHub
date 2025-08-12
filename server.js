@@ -5,9 +5,10 @@ import express from 'express';
 import os from 'node:os';
 import { pool } from './lib/db.js';
 import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
-import { finalizeYesterdayIfNeeded, pullToday } from './cronHelpers.js';
-import { runDailyCreativeRecs } from './dailyCreative.js';
+import { fetchFacebookInsights } from './facebookInsights.js';
+import { fetchYouTubeInsights } from './youtubeInsights.js';
 import { getDashboardLastSync } from './syncState.js';
+import { yesterdayRange, todayRange } from './lib/date.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
 
 const app = express();
@@ -59,16 +60,20 @@ app.get('/api/last-sync', async (_req, res) => {
 });
 
 app.post('/api/sync', async (req, res) => {
-  const scope = (req.body?.scope || 'all').toLowerCase();
+  const body = req.body || {};
+  const { since, until, scope = 'all' } = body;
+  const base = since && until ? { since, until } : {};
+  const doFb = scope === 'all' || scope === 'facebook';
+  const doYt = scope === 'all' || scope === 'youtube';
+  const range = since && until ? { since, until } : (process.env.SYNC_MODE === 'today' ? todayRange() : yesterdayRange());
   try {
-    if (scope === 'init') return res.json({ queued: true, note: 'Run `npm run backfill` on server once' });
-    if (scope === 'yesterday') { await finalizeYesterdayIfNeeded(); return res.json({ ok: true, scope }); }
-    if (scope === 'today') { await pullToday(); return res.json({ ok: true, scope }); }
-    if (scope === 'ai') { const out = await runDailyCreativeRecs(30); return res.json({ ok: true, ...out, scope }); }
-    await finalizeYesterdayIfNeeded();
-    await pullToday();
-    const out = await runDailyCreativeRecs(30);
-    res.json({ ok: true, ...out, scope: 'all' });
+    const fb = doFb ? fetchFacebookInsights(base).catch((e) => ({ error: true, message: e.message })) : null;
+    const yt = doYt ? fetchYouTubeInsights(base).catch((e) => ({ error: true, message: e.message })) : null;
+    const [fbRes, ytRes] = await Promise.all([fb, yt]);
+    const out = { ok: true, range };
+    if (fbRes !== null) out.facebook = fbRes.error ? fbRes : { count: fbRes.length };
+    if (ytRes !== null) out.youtube = ytRes.error ? ytRes : { count: ytRes.length };
+    res.json(out);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'sync failed' });

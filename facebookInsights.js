@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { DateTime } from 'luxon';
 import { log, logError } from './logger.js';
 import { INSIGHT_FIELDS } from './constants.js';
+import { yesterdayRange, todayRange } from './lib/date.js';
 
 dotenv.config();
 
@@ -25,14 +26,14 @@ async function makeRequest(url, params = {}, retries = 5, attempt = 0) {
   }
 }
 
-export async function fetchInsightsForAccount(accountId, date, accessToken) {
+export async function fetchInsightsForAccount(accountId, date, accessToken, level = 'campaign') {
   const actId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
   const url = `${FB_API_BASE_URL}/${actId}/insights`;
   const params = {
     access_token: accessToken,
     fields: INSIGHT_FIELDS.join(','),
     time_range: JSON.stringify({ since: date, until: date }),
-    level: 'ad',
+    level,
     limit: 500,
   };
   const results = [];
@@ -45,22 +46,23 @@ export async function fetchInsightsForAccount(accountId, date, accessToken) {
   return results;
 }
 
-export async function fetchFacebookInsights({ since, until, mode = 'history' }) {
-  log(`Fetching Facebook insights ${since}..${until} (${mode})`);
+export async function fetchFacebookInsights(opts = {}) {
+  const { since, until, level = 'campaign', accountIds } = opts;
+  const dateRange = since && until ? { since, until } : (process.env.SYNC_MODE === 'today' ? todayRange() : yesterdayRange());
+  log(`Fetching Facebook insights ${dateRange.since}..${dateRange.until}`);
   if (process.env.DEMO_MODE === 'true') return [];
   const accessToken = process.env.FB_ACCESS_TOKEN;
-  const accountEnv = process.env.FB_AD_ACCOUNTS;
   if (!accessToken) throw new Error('Missing FB_ACCESS_TOKEN');
-  if (!accountEnv) throw new Error('Missing FB_AD_ACCOUNTS');
-  const accountIds = accountEnv.split(',').map((id) => id.trim()).filter(Boolean);
-  const start = DateTime.fromISO(since);
-  const end = DateTime.fromISO(until);
+  const ids = accountIds && accountIds.length ? accountIds : (process.env.FB_AD_ACCOUNTS || '').split(',').map((id) => id.replace(/^act_/, '').trim()).filter(Boolean);
+  if (!ids.length) throw new Error('Missing FB_AD_ACCOUNTS');
+  const start = DateTime.fromISO(dateRange.since);
+  const end = DateTime.fromISO(dateRange.until);
   const allResults = [];
-  for (const id of accountIds) {
+  for (const id of ids) {
     for (let d = start; d <= end; d = d.plus({ days: 1 })) {
       const dateStr = d.toISODate();
       try {
-        const rows = await fetchInsightsForAccount(id, dateStr, accessToken);
+        const rows = await fetchInsightsForAccount(id, dateStr, accessToken, level);
         for (const r of rows) {
           const spend = Number(r.spend) || 0;
           const clicks = Number(r.clicks) || 0;

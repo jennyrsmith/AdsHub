@@ -278,3 +278,36 @@ npm run rollup:backfill
   401/403 → bad/missing x-api-key
   500 → backend exception (check server logs)
   Network errors → backend not running or proxy misconfigured
+
+## Private Deployment (Option 3: Public IP with Allow-List)
+
+### A. Configure env
+1. Copy `.env.example` to `.env` and fill in values.
+2. Set `SYNC_API_KEY` and `PG_URI` for your DigitalOcean Postgres instance.
+3. Optionally set `UI_USER` and `UI_PASS` to require basic auth for the UI.
+4. Set `CORS_ORIGINS` to trusted domains (comma-separated). Leave empty to block browser origins.
+
+### B. Start app (PM2 or systemd)
+Run the web server with your process manager of choice.
+
+### C. DigitalOcean Firewall
+Allow inbound ports **22** and **3000** only from your IP(s) and deny all other inbound traffic.
+
+### D. (Optional) UFW on droplet
+```bash
+chmod +x ops/ufw-allowlist.sh
+sudo ./ops/ufw-allowlist.sh init
+sudo ./ops/ufw-allowlist.sh add <YOUR_IP>
+```
+
+### E. Verify
+From an allowed IP:
+```bash
+curl -s http://<DROPLET_IP>:3000/healthz
+curl -s -H "x-api-key: $SYNC_API_KEY" "http://<DROPLET_IP>:3000/api/summary?range=7"
+```
+From a blocked IP you should see a connection timeout or firewall deny.
+
+### F. UI access
+If basic auth is enabled, the browser will prompt for `UI_USER` and `UI_PASS`.
+The UI's fetches already send the `x-api-key` header from `VITE_SYNC_API_KEY`.

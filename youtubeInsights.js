@@ -2,11 +2,14 @@ import axios from 'axios';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import { log } from './logger.js';
+import { yesterdayRange, todayRange } from './lib/date.js';
 
 dotenv.config();
 
-export async function fetchYoutubeInsights({ since, until, mode = 'history' }) {
-  log(`Fetching YouTube insights ${since}..${until} (${mode})`);
+export async function fetchYouTubeInsights(opts = {}) {
+  const { since, until } = opts;
+  const dateRange = since && until ? { since, until } : (process.env.SYNC_MODE === 'today' ? todayRange() : yesterdayRange());
+  log(`Fetching YouTube insights ${dateRange.since}..${dateRange.until}`);
   if (process.env.DEMO_MODE === 'true') return [];
   if (!process.env.GOOGLE_ADS_CUSTOMER_ID) {
     throw new Error('Missing GOOGLE_ADS_CUSTOMER_ID');
@@ -20,7 +23,7 @@ export async function fetchYoutubeInsights({ since, until, mode = 'history' }) {
   });
   const client = await auth.getClient();
   const token = await client.getAccessToken();
-  const query = `SELECT campaign.name, metrics.impressions, metrics.clicks, metrics.cost_micros, segments.date FROM campaign WHERE segments.date BETWEEN '${since}' AND '${until}' AND campaign.advertising_channel_type = 'VIDEO'`;
+  const query = `SELECT campaign.name, metrics.impressions, metrics.clicks, metrics.cost_micros, segments.date FROM campaign WHERE segments.date BETWEEN '${dateRange.since}' AND '${dateRange.until}' AND campaign.advertising_channel_type = 'VIDEO'`;
   const url = `https://googleads.googleapis.com/v14/customers/${process.env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:searchStream`;
   const res = await axios.post(url, { query }, {
     headers: {

@@ -168,17 +168,16 @@ Returns the most recent successful sync timestamps for each platform:
 ### POST `/api/sync`
 Trigger an on-demand sync. Requires header `x-api-key: SYNC_API_KEY`.
 
-Body (optional):
-```json
-{ "platform": "facebook" | "youtube" | "all" }
-```
+Defaults:
+- No body => pulls the previous full day
+- Provide `{ "scope": "all", "since": "YYYY-MM-DD", "until": "YYYY-MM-DD" }` for an explicit range
 
 Example:
 ```bash
 curl -X POST http://localhost:3005/api/sync \
   -H "x-api-key: $SYNC_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"platform":"facebook"}'
+  -d '{"scope":"facebook"}'
 ```
 
 ### GET `/api/summary?range=7|30&source=raw|rollup|auto`

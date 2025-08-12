@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import { getAuthedOAuth2 } from "../lib/googleOAuth.js";
 
-export async function googleAdsQuery({ customerId, gaql }) {
+export async function googleAdsQuery({ customerId, gaql } = {}) {
   // Access Token from OAuth
   const oauth = await getAuthedOAuth2("default");
   const accessToken = (await oauth.getAccessToken()).token;

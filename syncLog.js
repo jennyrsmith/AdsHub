@@ -1,6 +1,5 @@
-// Helper utilities for tracking sync completion times in Postgres
+// Helper utilities for tracking sync completion times and events in Postgres
 import { pool } from './lib/db.js';
-import { logError } from './logger.js';
 
 export async function ensureSyncLogTable() {
   const client = await pool.connect();
@@ -8,9 +7,6 @@ export async function ensureSyncLogTable() {
     await client.query(
       'CREATE TABLE IF NOT EXISTS sync_log (platform text primary key, finished_at timestamptz)'
     );
-  } catch (err) {
-    await logError('Failed to ensure sync_log table', err);
-    throw err;
   } finally {
     client.release();
   }
@@ -42,4 +38,17 @@ export async function upsertSyncLog(platform, finishedAt) {
   } finally {
     client.release();
   }
+}
+
+export async function logSync(scope, info) {
+  await pool.query(`create table if not exists sync_events (
+    id bigserial primary key,
+    scope text,
+    info jsonb,
+    created_at timestamptz default now()
+  )`);
+  await pool.query(
+    'insert into sync_events (scope, info) values ($1,$2::jsonb)',
+    [scope, JSON.stringify(info)]
+  );
 }

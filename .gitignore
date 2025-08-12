@@ -2,9 +2,13 @@ node_modules/
 ui/node_modules/
 ui/dist/
 logs/
+.env
+.env.dev
 credentials.json
 token.json
 .DS_Store
 data/
 ui/.env
 ui/.env.local
+keys/client_secret_887675652639-lkbkubfs06k3mlpfg5ddtoqkqjs76mg0.apps.googleusercontent.com.json
+keys/bbe-ads-hq-a00ce7684e8a.json

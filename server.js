@@ -5,7 +5,7 @@ import express from 'express';
 import os from 'node:os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { pool } from './lib/db.js';
+import { pool, getPool } from './lib/db.js';
 import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
 import { fetchFacebookInsights } from './facebookInsights.js';
 import { fetchYouTubeInsights } from './youtubeInsights.js';
@@ -48,6 +48,39 @@ app.get('/readyz', async (_req, res) => {
     return res.status(200).json({ ok: true });
   } catch (e) {
     return res.status(503).json({ ok: false, reason: 'db-error', error: e.message });
+  }
+});
+
+function requireApiKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (!process.env.SYNC_API_KEY || key !== process.env.SYNC_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+app.get('/api/summary', requireApiKey, async (req, res) => {
+  try {
+    const range = Math.max(1, Math.min(90, parseInt(req.query.range || '7', 10)));
+    const sql = `
+      WITH w AS (
+        SELECT date, spend, revenue, impressions, clicks
+        FROM daily_rollup
+        WHERE date >= (CURRENT_DATE - $1::int)
+      )
+      SELECT
+        COALESCE(SUM(spend),0)::float8 AS spend,
+        COALESCE(SUM(revenue),0)::float8 AS revenue,
+        CASE WHEN SUM(spend) > 0 THEN (SUM(revenue)/SUM(spend))::float8 ELSE 0 END AS roas,
+        COALESCE(SUM(impressions),0)::int AS impressions,
+        COALESCE(SUM(clicks),0)::int AS clicks
+      FROM w;
+    `;
+    const { rows } = await getPool().query(sql, [range]);
+    res.json({ range, ...rows[0] });
+  } catch (e) {
+    console.error('summary error', e);
+    res.status(500).json({ error: 'server-error' });
   }
 });
 

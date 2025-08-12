@@ -3,6 +3,8 @@ dotenv.config();
 
 import express from 'express';
 import os from 'node:os';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { pool } from './lib/db.js';
 import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
 import { fetchFacebookInsights } from './facebookInsights.js';
@@ -10,24 +12,23 @@ import { fetchYouTubeInsights } from './youtubeInsights.js';
 import { getDashboardLastSync } from './syncState.js';
 import { yesterdayRange, todayRange } from './lib/date.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
+import authRoutes from './routes/auth.js';
+import { sessionMiddleware, requireLogin } from './middleware/auth/session.js';
 
 const app = express();
 app.use(express.json());
+app.use(sessionMiddleware);
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
 const VERSION = process.env.npm_package_version || '0.0.0';
 const SHEETS_ENABLED = String(process.env.SHEETS_ENABLED || 'false').toLowerCase() === 'true';
 
-app.use('/api', googleAuthRoutes);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-function requireKey(req, res, next) {
-  const k = req.headers['x-api-key'];
-  if (!process.env.SYNC_API_KEY || k !== process.env.SYNC_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-}
+// --- Public routes ---
+app.use('/auth', authRoutes);
 
 // --- Health endpoints ---
 app.get('/healthz', (req, res) => {
@@ -50,8 +51,9 @@ app.get('/readyz', async (_req, res) => {
   }
 });
 
-// existing routes
-app.use('/api', requireKey);
+// --- Authenticated API routes ---
+app.use('/api', requireLogin);
+app.use('/api', googleAuthRoutes);
 app.use('/api', aiCreativeRoutes);
 
 app.get('/api/last-sync', async (_req, res) => {
@@ -78,6 +80,17 @@ app.post('/api/sync', async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'sync failed' });
   }
+});
+
+// --- Static UI ---
+app.use(express.static(path.join(__dirname, 'ui', 'dist')));
+
+app.get('/login', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'ui', 'dist', 'index.html'));
+});
+
+app.get('*', requireLogin, (req, res) => {
+  res.sendFile(path.join(__dirname, 'ui', 'dist', 'index.html'));
 });
 
 // --- Startup log ---

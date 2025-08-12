@@ -5,6 +5,7 @@ import FiltersBar from "../components/filters/FiltersBar";
 import KPICards from "../components/kpi/KPICards";
 import ChannelChart from "../components/charts/ChannelChart";
 import TablePage from "../components/table/TablePage";
+import AiHighlights from "../components/ai/AiHighlights";
 
 export default function ViewportPage() {
   const [filters, setFilters] = useState({
@@ -22,6 +23,7 @@ export default function ViewportPage() {
       <KPICards range={filters.range === "custom" ? undefined : filters.range} />
       <ChannelChart />
       <TablePage filters={filtersWithSetter} />
+      <AiHighlights />
     </Shell>
   );
 }

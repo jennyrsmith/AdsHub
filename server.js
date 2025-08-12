@@ -20,6 +20,8 @@ import { summaryCache } from './summaryCache.js';
 import { pool, queryWithRetry, closeDb } from './lib/db.js';
 import { connectRedis, redis, closeRedis } from './lib/redis.js';
 import { createRequire } from 'module';
+import cors from 'cors';
+import basicAuth from 'express-basic-auth';
 
 dotenv.config();
 
@@ -47,7 +49,6 @@ try {
 connectRedis().catch((err) => logError('redis connect failed', err));
 
 const app = express();
-const PORT = process.env.PORT || 3005;
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -55,17 +56,30 @@ app.use((req, res, next) => {
   next();
 });
 
-function checkApiKey(req, res, next) {
-  const key = req.headers['x-api-key'];
-  if (key && key === process.env.SYNC_API_KEY) return next();
-  return res.status(401).json({ error: 'Unauthorized' });
-}
+// --- CORS ---
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // allow curl / same-origin
+    if (corsOrigins.length && corsOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked'), false);
+  },
+  credentials: false,
+};
+app.use('/api', cors(corsOptions));
 
-const REQUIRE_KEY_PUBLIC = process.env.REQUIRE_KEY_PUBLIC === 'true';
-function maybeAuth(req, res, next) {
-  if (REQUIRE_KEY_PUBLIC) return checkApiKey(req, res, next);
-  return next();
+// --- API key auth ---
+function apiAuth(req, res, next) {
+  const k = req.header('x-api-key');
+  if (!process.env.SYNC_API_KEY || k !== process.env.SYNC_API_KEY) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
 }
+app.use('/api', apiAuth);
 
 app.get('/healthz', async (req, res) => {
   const status = { status: 'ok', db: 'down', redis: 'down', version };
@@ -146,7 +160,7 @@ function rateLimitExport(req, res, next) {
   next();
 }
 
-app.get('/api/last-sync', maybeAuth, async (req, res, next) => {
+app.get('/api/last-sync', async (req, res, next) => {
   try {
     const times = await getLastSyncTimes();
     res.json({
@@ -158,7 +172,7 @@ app.get('/api/last-sync', maybeAuth, async (req, res, next) => {
   }
 });
 
-app.post('/api/sync', checkApiKey, async (req, res) => {
+app.post('/api/sync', async (req, res) => {
   const platform = req.body.platform || 'all';
   const platforms = platform === 'all' ? ['facebook', 'youtube'] : [platform];
   let recordsSynced = 0;
@@ -190,7 +204,7 @@ app.post('/api/sync', checkApiKey, async (req, res) => {
   }
 });
 
-app.get('/api/summary', maybeAuth, async (req, res, next) => {
+app.get('/api/summary', async (req, res, next) => {
   const range = Number(req.query.range || 7);
   const source = req.query.source || 'auto';
   if (![7, 30].includes(range)) {
@@ -298,7 +312,7 @@ app.get('/api/summary', maybeAuth, async (req, res, next) => {
   }
 });
 
-app.get('/api/rows', maybeAuth, async (req, res, next) => {
+app.get('/api/rows', async (req, res, next) => {
   const {
     platform = 'all',
     start,
@@ -330,7 +344,7 @@ app.get('/api/rows', maybeAuth, async (req, res, next) => {
   }
 });
 
-app.get('/api/export.csv', checkApiKey, rateLimitExport, async (req, res) => {
+app.get('/api/export.csv', rateLimitExport, async (req, res) => {
   const { platform = 'all', start, end, q, sort } = req.query;
   if (!start || !end) {
     return res.status(400).json({ error: 'start and end required' });
@@ -395,6 +409,13 @@ app.get('/api/export.csv', checkApiKey, rateLimitExport, async (req, res) => {
   }
 });
 
+const { UI_USER, UI_PASS } = process.env;
+if (UI_USER && UI_PASS) {
+  app.use(
+    ['/', '/index.html', '/assets', '/ui', '/ui/*'],
+    basicAuth({ users: { [UI_USER]: UI_PASS }, challenge: true })
+  );
+}
 const uiPath = path.join(__dirname, 'ui', 'dist');
 app.use(express.static(uiPath));
 
@@ -408,8 +429,10 @@ app.use(async (err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-const server = app.listen(PORT, () => {
-  log(`Server listening on ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = Number(process.env.PORT || 3000);
+const server = app.listen(PORT, HOST, () => {
+  log(`Server listening on ${HOST}:${PORT}`);
 });
 
 function shutdown() {

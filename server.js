@@ -1,22 +1,26 @@
-import express from 'express';
 import dotenv from 'dotenv';
-import { migrate } from './scripts/migrate.js';
-import { pool } from './lib/db.js';
+dotenv.config();
+
+import express from 'express';
+import os from 'node:os';
+import { pool, ping } from './db.js';
 import aiCreativeRoutes from './routes/aiCreativeRoutes.js';
 import { finalizeYesterdayIfNeeded, pullToday } from './cronHelpers.js';
 import { runDailyCreativeRecs } from './dailyCreative.js';
 import { getDashboardLastSync } from './syncState.js';
-import googleAuthRoutes from "./routes/googleAuthRoutes.js";
-
-dotenv.config();
-await migrate();
+import googleAuthRoutes from './routes/googleAuthRoutes.js';
 
 const app = express();
 app.use(express.json());
 
-app.use("/api", googleAuthRoutes);
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '0.0.0.0';
+const VERSION = process.env.npm_package_version || '0.0.0';
+const SHEETS_ENABLED = String(process.env.SHEETS_ENABLED || 'false').toLowerCase() === 'true';
 
-function requireKey(req,res,next){
+app.use('/api', googleAuthRoutes);
+
+function requireKey(req, res, next) {
   const k = req.headers['x-api-key'];
   if (!process.env.SYNC_API_KEY || k !== process.env.SYNC_API_KEY) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -24,36 +28,69 @@ function requireKey(req,res,next){
   next();
 }
 
-app.get('/healthz', async (_req,res)=>{
-  try { await pool.query('select 1'); res.json({status:'ok'}); }
-  catch { res.status(500).json({status:'error'}); }
+// --- Health endpoints ---
+app.get('/healthz', (req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'adshub-api',
+    version: VERSION,
+    uptime: process.uptime(),
+    host: os.hostname(),
+    sheetsEnabled: SHEETS_ENABLED
+  });
 });
-app.get('/readyz', (_req,res)=> res.json({status:'ok'}));
 
+app.get('/readyz', async (req, res) => {
+  try {
+    const ok = await ping();
+    if (ok) return res.status(200).json({ ok: true });
+    return res.status(500).json({ ok: false, reason: 'db-ping-failed' });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'db-error', error: e.message });
+  }
+});
+
+// existing routes
 app.use('/api', requireKey);
 app.use('/api', aiCreativeRoutes);
 
-app.get('/api/last-sync', async (_req,res)=>{
+app.get('/api/last-sync', async (_req, res) => {
   const data = await getDashboardLastSync();
   res.json(data);
 });
 
-app.post('/api/sync', async (req,res)=>{
+app.post('/api/sync', async (req, res) => {
   const scope = (req.body?.scope || 'all').toLowerCase();
   try {
     if (scope === 'init') return res.json({ queued: true, note: 'Run `npm run backfill` on server once' });
     if (scope === 'yesterday') { await finalizeYesterdayIfNeeded(); return res.json({ ok: true, scope }); }
     if (scope === 'today') { await pullToday(); return res.json({ ok: true, scope }); }
-    if (scope === 'ai') { const out = await runDailyCreativeRecs(30); return res.json({ ok:true, ...out, scope }); }
+    if (scope === 'ai') { const out = await runDailyCreativeRecs(30); return res.json({ ok: true, ...out, scope }); }
     await finalizeYesterdayIfNeeded();
     await pullToday();
     const out = await runDailyCreativeRecs(30);
-    res.json({ ok: true, ...out, scope:'all' });
+    res.json({ ok: true, ...out, scope: 'all' });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'sync failed' });
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server listening on ${port}`));
+// --- Startup log ---
+app.listen(PORT, HOST, () => {
+  const dbHost = (() => {
+    try {
+      const u = new URL(process.env.PG_URI);
+      return u.hostname + ':' + (u.port || '5432');
+    } catch {
+      return 'unknown';
+    }
+  })();
+  console.log(
+    `[start] adshub-api v${VERSION} listening on http://${HOST}:${PORT} (${process.env.NODE_ENV || 'dev'})`
+  );
+  console.log(`[config] DB host=${dbHost} sheetsEnabled=${SHEETS_ENABLED} pg_ssl_ca=${process.env.PG_SSL_CA || '(none)'}`);
+});
+
+export default app;
+

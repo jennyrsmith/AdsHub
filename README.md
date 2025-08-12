@@ -319,3 +319,34 @@ The UI's fetches already send the `x-api-key` header from `VITE_SYNC_API_KEY`.
 - Run dev UI: `npm run ui`
 - Backend should be running: `npm start`
 - Endpoints used: /api/last-sync, /api/sync (POST), /api/summary, /api/rows, /api/export.csv
+
+## Server Update Workflow
+
+To pull latest code on the server and run migrations safely:
+
+```bash
+chmod +x scripts/update-from-github.sh
+./scripts/update-from-github.sh
+```
+
+- Local changes are stashed automatically.
+- certs/db-ca.pem is used if present; otherwise pool falls back to sslmode=require with rejectUnauthorized:false.
+- Migrations print exact failing file + SQL error on failure.
+
+---
+
+### 3) What you’ll run on the server
+
+```bash
+# from /root/AdsHub
+chmod +x scripts/update-from-github.sh
+./scripts/update-from-github.sh
+
+If you need strict SSL with CA verification:
+
+# Ensure the cert exists (the file you pasted earlier)
+ls certs/db-ca.pem
+
+# Optionally set explicit path (not required since we auto-check certs/db-ca.pem)
+export PG_CA_PATH=/root/AdsHub/certs/db-ca.pem
+```

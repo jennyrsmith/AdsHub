@@ -1,76 +1,55 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { pool } from '../lib/db.js';
 
-// Load database pool after env vars are available
-const { pool, closeDb } = await import('../lib/db.js');
-import fs from 'node:fs';
-import path from 'node:path';
-import url from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
+async function runMigrations() {
+  const dir = path.join(__dirname, '..', 'migrations');
+  const files = fs.readdirSync(dir)
+    .filter(f => /^\d+_.*\.sql$/.test(f))
+    .sort((a,b) => Number(a.split('_')[0]) - Number(b.split('_')[0]));
 
-async function migrate() {
-  const client = await pool.connect();
-  let currentFile;
-  try {
-    await client.query('BEGIN');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        id SERIAL PRIMARY KEY,
-        filename TEXT UNIQUE NOT NULL,
-        executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
+  await pool.query(`create table if not exists schema_migrations (filename text primary key, executed_at timestamptz not null default now())`);
 
-    const files = fs
-      .readdirSync(MIGRATIONS_DIR)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
-    for (const f of files) {
-      currentFile = f;
-      const { rows } = await client.query(
-        'SELECT 1 FROM schema_migrations WHERE filename=$1',
-        [f],
-      );
-      if (rows.length) continue;
+  for (const file of files) {
+    const applied = await pool.query('select 1 from schema_migrations where filename=$1', [file]);
+    if (applied.rowCount) continue;
 
-      console.log(`[migrate] Running ${f}`);
-      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8');
-      await client.query(sql);
-      await client.query('INSERT INTO schema_migrations(filename) VALUES ($1)', [f]);
-      console.log(`[migrate] Finished ${f}`);
+    const sql = fs.readFileSync(path.join(dir, file)).toString();
+    console.log(new Date().toISOString(), '- Running migration', file);
+    try {
+      await pool.query('begin');
+      await pool.query(sql);
+      await pool.query('insert into schema_migrations (filename) values ($1)', [file]);
+      await pool.query('commit');
+      console.log(new Date().toISOString(), '- Finished', file);
+    } catch (err) {
+      await pool.query('rollback');
+      console.error('Migration failed in', file);
+      console.error('Message:', err.message);
+      console.error('Detail:', err.detail || '(no detail)');
+      console.error('Where:', err.where || '(no where)');
+      console.error('Stack:', err.stack);
+      throw err;
     }
-    await client.query('COMMIT');
-    console.log('[migrate] All migrations complete');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    err.migrationFile = currentFile;
-    throw err;
-  } finally {
-    client.release();
   }
 }
 
-let exitCode = 0;
-try {
-  await migrate();
-} catch (err) {
-  exitCode = 1;
-  console.error(
-    `[migrate] Failed migration file: ${err.migrationFile || 'unknown'}`,
-  );
-  if (err instanceof AggregateError) {
-    for (const e of err.errors) {
-      console.error(e.message);
-      console.error(e.stack);
+runMigrations()
+  .then(() => {
+    console.log(new Date().toISOString(), '- Migrations complete');
+    return pool.end();
+  })
+  .catch(async (err) => {
+    // Unwrap AggregateError
+    if (err?.errors && Array.isArray(err.errors)) {
+      err.errors.forEach((e, i) => console.error(`Aggregate suberror ${i+1}:`, e));
     }
-  } else {
-    console.error(err.message);
-    console.error(err.stack);
-  }
-}
-
-await closeDb();
-process.exit(exitCode);
-
+    console.error(new Date().toISOString(), '- Migration run failed -', err.name || 'Error');
+    try { await pool.end(); } catch {}
+    process.exit(1);
+  });

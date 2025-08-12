@@ -1,1 +1,1 @@
-export { pool, queryWithRetry, closeDb } from './lib/db.js';
+export { pool } from './lib/db.js';

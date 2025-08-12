@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { DateTime } from 'luxon';
 import { refreshDailyRollup } from './lib/rollups.js';
 import { log, logError } from './logger.js';
-import { closeDb } from './lib/db.js';
+import { pool } from './lib/db.js';
 
 dotenv.config();
 
@@ -36,13 +36,15 @@ async function run() {
     await sleep(500);
     current = chunkEnd.plus({ days: 1 });
   }
-  await closeDb();
 }
 
 run()
-  .then(() => process.exit(0))
+  .then(async () => {
+    await pool.end();
+    process.exit(0);
+  })
   .catch(async (err) => {
     await logError('Rollup backfill error', err);
-    await closeDb();
+    try { await pool.end(); } catch {}
     process.exit(1);
   });

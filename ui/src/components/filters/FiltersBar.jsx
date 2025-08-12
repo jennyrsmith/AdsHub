@@ -1,68 +1,40 @@
-import React, { useState } from 'react';
+import StripeCard from "../shared/StripeCard";
+import { useURLFilters } from "../../lib/filters";
 
 export default function FiltersBar() {
-  const [state, setState] = useState({
-    q: '',
-    platform: 'all',
-    date: '7d',
-    format: 'daily',
-    sort: 'spend',
-    breakdown: 'none'
-  });
-
-  function update(field) {
-    return (e) => setState({ ...state, [field]: e.target.value });
-  }
+  const { filters, setFilters } = useURLFilters();
+  const set = (k) => (e) => setFilters(f => ({ ...f, [k]: e.target.value, page: 1 }));
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
-      <input
-        className="border border-border rounded px-3 py-2 flex-1"
-        placeholder="Search"
-        value={state.q}
-        onChange={update('q')}
-      />
-      <select
-        className="border border-border rounded px-3 py-2"
-        value={state.platform}
-        onChange={update('platform')}
-      >
-        <option value="all">All Platforms</option>
-        <option value="facebook">Facebook</option>
-        <option value="google">Google</option>
-      </select>
-      <select
-        className="border border-border rounded px-3 py-2"
-        value={state.date}
-        onChange={update('date')}
-      >
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
-      </select>
-      <select
-        className="border border-border rounded px-3 py-2"
-        value={state.format}
-        onChange={update('format')}
-      >
-        <option value="daily">Daily</option>
-        <option value="total">Total</option>
-      </select>
-      <select
-        className="border border-border rounded px-3 py-2"
-        value={state.sort}
-        onChange={update('sort')}
-      >
-        <option value="spend">Sort: Spend</option>
-        <option value="revenue">Sort: Revenue</option>
-      </select>
-      <select
-        className="border border-border rounded px-3 py-2"
-        value={state.breakdown}
-        onChange={update('breakdown')}
-      >
-        <option value="none">No Breakdown</option>
-        <option value="device">Device</option>
-      </select>
-    </div>
+    <StripeCard className="mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+        <input className="border border-border rounded-md px-3 py-2" placeholder="Search…" value={filters.search} onChange={set("search")} />
+        <select className="border border-border rounded-md px-3 py-2 bg-white" value={filters.channel} onChange={set("channel")}>
+          <option>All</option><option>Facebook Ads</option><option>YouTube Ads</option>
+        </select>
+        <select className="border border-border rounded-md px-3 py-2 bg-white" value={filters.range} onChange={set("range")}>
+          <option>Last 7</option><option>Last 30</option><option>Custom</option>
+        </select>
+        {filters.range === "Custom" && (
+          <>
+            <input type="date" className="border border-border rounded-md px-3 py-2" value={filters.start} onChange={set("start")} />
+            <input type="date" className="border border-border rounded-md px-3 py-2" value={filters.end} onChange={set("end")} />
+          </>
+        )}
+        <select className="border border-border rounded-md px-3 py-2 bg-white" value={filters.format} onChange={set("format")}>
+          <option>All</option><option>Static</option><option>Video</option>
+        </select>
+        <div className="flex gap-2">
+          <select className="border border-border rounded-md px-3 py-2 bg-white flex-1" value={filters.sortBy} onChange={set("sortBy")}>
+            <option value="Spend">Spend</option><option value="ROAS">ROAS</option>
+            <option value="CTR">CTR</option><option value="CR">CR</option>
+            <option value="CAC">CAC</option><option value="CV">CV</option>
+          </select>
+          <select className="border border-border rounded-md px-3 py-2 bg-white" value={filters.sortDir} onChange={set("sortDir")}>
+            <option value="desc">▼</option><option value="asc">▲</option>
+          </select>
+        </div>
+      </div>
+    </StripeCard>
   );
 }

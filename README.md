@@ -311,3 +311,11 @@ From a blocked IP you should see a connection timeout or firewall deny.
 ### F. UI access
 If basic auth is enabled, the browser will prompt for `UI_USER` and `UI_PASS`.
 The UI's fetches already send the `x-api-key` header from `VITE_SYNC_API_KEY`.
+
+### UI Live Data
+- Configure `/ui/.env.local` (dev) or `.env.production` (build):
+  - `VITE_API_BASE` = http://localhost:3000 (dev) or https://<droplet-ip> (prod)
+  - `VITE_SYNC_API_KEY` = your API key (matches server)
+- Run dev UI: `npm run ui`
+- Backend should be running: `npm start`
+- Endpoints used: /api/last-sync, /api/sync (POST), /api/summary, /api/rows, /api/export.csv

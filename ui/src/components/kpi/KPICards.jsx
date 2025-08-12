@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import StripeCard from "../shared/StripeCard";
-import { apiFetch, buildQuery } from "../../lib/api";
-import { useURLFilters } from "../../lib/filters";
-import { toast } from "../../lib/toast";
+import { Api } from "../../lib/api";
 
 function Kpi({label, value, sub}) {
   return (
@@ -14,38 +12,42 @@ function Kpi({label, value, sub}) {
   );
 }
 
-export default function KPICards() {
-  const { queryForAPI } = useURLFilters();
-  const [kpi, setKpi] = useState({ spend: 0, revenue: 0, roas: 0, impressions: 0, clicks: 0 });
+export default function KPICards({ range = "7" }) {
+  const [kpi, setKpi] = useState(null);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
+    let abort = new AbortController();
     (async () => {
+      setErr("");
       try {
-        const q = buildQuery({ range: queryForAPI.range, start: queryForAPI.start, end: queryForAPI.end });
-        const data = await apiFetch(`/api/summary${q}`);
-        setKpi({
-          spend: data?.totals?.spend || 0,
-          revenue: data?.totals?.revenue || data?.totals?.cv || 0,
-          roas: data?.totals?.roas || 0,
-          impressions: data?.totals?.impressions || 0,
-          clicks: data?.totals?.clicks || 0
-        });
+        const data = await Api.summary({ range });
+        setKpi(data); // expect {spend, revenue, roas, impressions, clicks, byChannel:[{platform,spend,roas}]}
       } catch (e) {
-        toast(`Summary failed: ${e.message}`, "error");
+        setErr(e.message || "Failed to load summary");
       }
     })();
-  }, [queryForAPI.range, queryForAPI.start, queryForAPI.end]);
+    return () => abort.abort();
+  }, [range]);
 
-  const fm = (n) => Intl.NumberFormat().format(Math.round(n));
-  const money = (n) => `$${Intl.NumberFormat().format(+n.toFixed(0))}`;
+  if (err) {
+    return <div className="text-sm text-red-600 mb-6">{err}</div>;
+  }
+  if (!kpi) {
+    return <div className="text-sm text-muted mb-6">Loading summary…</div>;
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
-      <Kpi label="Spend" value={money(kpi.spend)} />
-      <Kpi label="Revenue" value={money(kpi.revenue)} />
-      <Kpi label="ROAS" value={`${kpi.roas.toFixed(2)}x`} />
-      <Kpi label="Impressions" value={fm(kpi.impressions)} />
-      <Kpi label="Clicks" value={fm(kpi.clicks)} />
+      <Kpi label="Spend"       value={fmtMoney(kpi.spend)}        sub={kpi.deltaSpend} />
+      <Kpi label="Revenue"     value={fmtMoney(kpi.revenue)}      sub={kpi.deltaRevenue} />
+      <Kpi label="ROAS"        value={`${fmtNum(kpi.roas)}x`}     sub="target ≥ 2.0x" />
+      <Kpi label="Impressions" value={fmtInt(kpi.impressions)} />
+      <Kpi label="Clicks"      value={fmtInt(kpi.clicks)} />
     </div>
   );
 }
+
+function fmtMoney(n){ return n==null ? "—" : n.toLocaleString(undefined,{style:"currency",currency:"USD"}); }
+function fmtInt(n){ return n==null ? "—" : n.toLocaleString(); }
+function fmtNum(n){ return n==null ? "—" : Number(n).toFixed(2); }

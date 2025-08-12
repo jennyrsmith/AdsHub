@@ -1,18 +1,27 @@
-import Shell from "../components/layout/Shell.jsx";
-import StatusBar from "../components/status/StatusBar.jsx";
-import FiltersBar from "../components/filters/FiltersBar.jsx";
-import KPICards from "../components/kpi/KPICards.jsx";
-import ChannelChart from "../components/charts/ChannelChart.jsx";
-import TablePage from "../components/table/TablePage.jsx";
+import { useMemo, useState } from "react";
+import Shell from "../components/layout/Shell";
+import StatusBar from "../components/status/StatusBar";
+import FiltersBar from "../components/filters/FiltersBar";
+import KPICards from "../components/kpi/KPICards";
+import ChannelChart from "../components/charts/ChannelChart";
+import TablePage from "../components/table/TablePage";
 
 export default function ViewportPage() {
+  const [filters, setFilters] = useState({
+    search:"", channel:"All", range:"7", format:"All",
+    sortBy:"Spend", breakdown:"Campaign", page:1, pageSize:50, start:"", end:""
+  });
+
+  // tiny setter so TablePage can nudge pagination
+  const filtersWithSetter = useMemo(()=>({ ...filters, _set:setFilters }), [filters]);
+
   return (
     <Shell>
       <StatusBar />
-      <FiltersBar />
-      <KPICards />
+      <FiltersBar value={filters} onChange={setFilters} />
+      <KPICards range={filters.range === "custom" ? undefined : filters.range} />
       <ChannelChart />
-      <TablePage />
+      <TablePage filters={filtersWithSetter} />
     </Shell>
   );
 }

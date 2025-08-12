@@ -61,25 +61,37 @@ function requireApiKey(req, res, next) {
 
 app.get('/api/summary', requireApiKey, async (req, res) => {
   try {
-    const range = Math.max(1, Math.min(90, parseInt(req.query.range || '7', 10)));
-    const sql = `
-      WITH w AS (
-        SELECT date, spend, revenue, impressions, clicks
-        FROM daily_rollup
-        WHERE date >= (CURRENT_DATE - $1::int)
-      )
+    const { rows } = await getPool().query(`
       SELECT
         COALESCE(SUM(spend),0)::float8 AS spend,
         COALESCE(SUM(revenue),0)::float8 AS revenue,
         CASE WHEN SUM(spend) > 0 THEN (SUM(revenue)/SUM(spend))::float8 ELSE 0 END AS roas,
         COALESCE(SUM(impressions),0)::int AS impressions,
         COALESCE(SUM(clicks),0)::int AS clicks
-      FROM w;
-    `;
-    const { rows } = await getPool().query(sql, [range]);
-    res.json({ range, ...rows[0] });
+      FROM daily_rollup
+      WHERE date >= CURRENT_DATE - 7
+    `);
+    res.json({ range: 7, ...rows[0] });
   } catch (e) {
-    console.error('summary error', e);
+    console.error('summary error:', e.message);
+    res.status(500).json({ error: 'server-error' });
+  }
+});
+
+app.get('/api/rows', requireApiKey, async (req, res) => {
+  try {
+    const limit = Math.min(500, parseInt(req.query.limit || '100', 10));
+    const { rows } = await getPool().query(`
+      SELECT date, platform, campaign_name, adset_name, ad_name,
+             spend, revenue, roas, ctr, clicks, impressions
+      FROM daily_rollup
+      ORDER BY date DESC
+      LIMIT $1
+    `, [limit]);
+
+    res.json({ rows, total: rows.length });
+  } catch (e) {
+    console.error('rows error:', e.message);
     res.status(500).json({ error: 'server-error' });
   }
 });

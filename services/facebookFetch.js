@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { DateTime } from 'luxon';
-import { getPool } from '../lib/db.js';
+import { pool } from '../lib/db.js';
 
 const API_BASE = 'https://graph.facebook.com/v18.0';
 
@@ -32,7 +32,6 @@ export async function facebookFetch({ since, until } = {}) {
   const acts = accounts();
   if (!acts.length) throw new Error('FB_AD_ACCOUNTS missing');
 
-  const pool = getPool();
   const start = DateTime.fromISO(since || DateTime.utc().minus({ days: 1 }).toISODate());
   const end = DateTime.fromISO(until || start.toISODate());
   let inserted = 0;

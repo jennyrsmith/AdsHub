@@ -1,12 +1,9 @@
 import axios from 'axios';
-import pkg from 'pg';
 import dotenv from 'dotenv';
 import { log } from './logger.js';
+import { pool } from './lib/db.js';
 
 dotenv.config();
-
-const { Pool } = pkg;
-import { pool } from './lib/db.js';
 
 export async function runReport() {
   if (!process.env.PG_URI) {

@@ -35,7 +35,8 @@ services:
     nodeVersion: 20
     branch: main
     autoDeploy: true
-    buildCommand: "npm install"
+    # Install dependencies and build the UI so static assets are available
+    buildCommand: "npm install && npm run build:ui"
     startCommand: "node server.js"
     envVars:
       - fromGroup: adshub-env

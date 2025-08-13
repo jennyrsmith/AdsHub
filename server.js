@@ -16,6 +16,7 @@ import authRoutes from './routes/auth.js';
 import { sessionMiddleware, requireLogin } from './middleware/auth/session.js';
 
 const app = express();
+app.use((req,res,next)=>{ console.log("REQ", req.method, req.path); next(); });
 app.use(express.json());
 app.use(sessionMiddleware);
 

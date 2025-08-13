@@ -12,7 +12,7 @@
     "backfill": "node backfill.js",
     "rotate-token": "node rotateToken.js",
     "ui": "npm --prefix ui run dev",
-    "ui:build": "npm --prefix ui run build",
+    "ui:build": "node scripts/buildUi.js",
     "ui:lint": "npm --prefix ui run lint",
     "start:web": "npm run ui:build && node server.js",
     "migrate": "node scripts/migrate.js",

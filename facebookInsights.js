@@ -18,6 +18,11 @@ async function makeRequest(url, params = {}, retries = 5, attempt = 0) {
     return response.data;
   } catch (error) {
     const status = error.response?.status;
+    const code = error.response?.data?.error?.code;
+    if (code === 190) {
+      error.fbExpired = true;
+      throw error;
+    }
     if ((status === 429 || status >= 500) && attempt < retries) {
       const wait = Math.pow(2, attempt) * 1000;
       await delay(wait);
@@ -86,6 +91,10 @@ export async function fetchFacebookInsights(opts = {}) {
           });
         }
       } catch (err) {
+        if (err.fbExpired || err.response?.data?.error?.code === 190) {
+          await logError('Facebook access token expired', err);
+          return allResults;
+        }
         await logError(`Error fetching data for account ${id} on ${dateStr}`, err);
       }
     }

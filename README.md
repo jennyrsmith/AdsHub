@@ -32,7 +32,8 @@ Create `/ui/.env.local` and set `VITE_SYNC_API_KEY` to enable authenticated acti
    Create a `.env` file with:
    ```env
    FB_ACCESS_TOKEN=your_token
-   FB_AD_ACCOUNTS=act_123,act_456
+   FB_BUSINESS_ID=1013395692075293
+   FB_AD_ACCOUNTS=act_420838866444927,act_1538360642912126
    FB_APP_ID=your_fb_app_id
    FB_APP_SECRET=your_fb_app_secret
    PG_URI=postgres://user:pass@host/db
@@ -197,6 +198,13 @@ Query params:
 | `offset` | pagination offset (default 0) |
 
 Returns `{"rows": [...], "total": number}` with a combined view of Facebook and YouTube records.
+
+### GET `/api/fb/diag`
+Returns diagnostics for the configured Facebook token and accounts. Requires header `x-api-key: SYNC_API_KEY`.
+
+```json
+{ "ok": true, "tokenOwner": { "id": "123", "name": "Owner" }, "accounts": [{ "id": "act_1", "canRead": true }], "missingPermissions": [] }
+```
 
 ### GET `/api/export.csv`
 Same filters as `/api/rows` and protected by header `x-api-key: SYNC_API_KEY`.

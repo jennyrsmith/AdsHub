@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { log, logError } from './logger.js';
 import { INSIGHT_FIELDS } from './constants.js';
 import { yesterdayRange, todayRange } from './lib/date.js';
+import { FB_AD_ACCOUNTS } from './config/facebook.js';
 
 dotenv.config();
 
@@ -53,7 +54,9 @@ export async function fetchFacebookInsights(opts = {}) {
   if (process.env.DEMO_MODE === 'true') return [];
   const accessToken = process.env.FB_ACCESS_TOKEN;
   if (!accessToken) throw new Error('Missing FB_ACCESS_TOKEN');
-  const ids = accountIds && accountIds.length ? accountIds : (process.env.FB_AD_ACCOUNTS || '').split(',').map((id) => id.replace(/^act_/, '').trim()).filter(Boolean);
+  const ids = accountIds && accountIds.length
+    ? accountIds
+    : FB_AD_ACCOUNTS.map((id) => id.replace(/^act_/, '')).filter(Boolean);
   if (!ids.length) throw new Error('Missing FB_AD_ACCOUNTS');
   const start = DateTime.fromISO(dateRange.since);
   const end = DateTime.fromISO(dateRange.until);

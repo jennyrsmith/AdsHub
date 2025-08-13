@@ -3,8 +3,10 @@ envVarGroups:
     envVars:
       - key: FB_ACCESS_TOKEN
         value: ""
+      - key: FB_BUSINESS_ID
+        value: "1013395692075293"
       - key: FB_AD_ACCOUNTS
-        value: ""
+        value: "act_420838866444927,act_1538360642912126"
       - key: FB_APP_ID
         value: ""
       - key: FB_APP_SECRET

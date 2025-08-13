@@ -1,1 +1,1 @@
-export { pool, getPool } from './lib/db.js';
+export { pool, query } from './lib/db.js';

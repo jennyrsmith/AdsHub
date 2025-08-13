@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import StripeCard from "../shared/StripeCard";
 import { Api } from "../../lib/api";
+import { toast } from "../../lib/toast";
 
 export default function StatusBar() {
   const [last, setLast] = useState({ facebook: null, youtube: null });
@@ -14,6 +15,15 @@ export default function StatusBar() {
       setLast(data || {});
     } catch (e) {
       setErr(e.message || "Failed to fetch last sync");
+    }
+
+    try {
+      const diag = await Api.fbDiag();
+      if (!diag.ok) {
+        toast("Facebook token looks invalid or expired. Regenerate a token with ads_read and read_insights.", "error");
+      }
+    } catch {
+      toast("Facebook token looks invalid or expired. Regenerate a token with ads_read and read_insights.", "error");
     }
   }
 

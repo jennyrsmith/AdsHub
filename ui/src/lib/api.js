@@ -33,6 +33,7 @@ export const Api = {
   sync:     (scope = "all") => apiFetch("/api/sync", { method: "POST", body: { scope } }),
   summary:  (params) => apiFetch(`/api/summary${toQs(params)}`),
   rows:     (params) => apiFetch(`/api/rows${toQs(params)}`),
+  fbDiag:   () => apiFetch("/api/fb/diag"),
   exportCsv:(params) => `${API_BASE}/api/export.csv${toQs(params)}`,
 };
 

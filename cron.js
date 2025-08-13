@@ -7,6 +7,7 @@ import { runDailyCreativeRecs } from "./dailyCreative.js";
 import { getAuthedOAuth2 } from "./lib/googleOAuth.js";
 import { yesterdayRange, todayRange } from "./lib/date.js";
 import { log, logError } from "./logger.js";
+import { refreshRecentWindows } from "./lib/rollups.js";
 
 const TZ = process.env.TZ || "UTC";
 
@@ -21,6 +22,7 @@ async function syncToday() {
       await logError(`cron today ${name} failed`, e);
     }
   }
+  try { await refreshRecentWindows(); } catch (e) { await logError('cron refreshRecentWindows failed', e); }
 }
 
 async function archiveYesterday() {
@@ -34,6 +36,7 @@ async function archiveYesterday() {
       await logError(`cron yesterday ${name} failed`, e);
     }
   }
+  try { await refreshRecentWindows(); } catch (e) { await logError('cron refreshRecentWindows failed', e); }
 }
 
 // 4× per day: 00:15, 06:15, 12:15, 18:15 (local TZ)

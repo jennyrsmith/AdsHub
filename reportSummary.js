@@ -6,7 +6,7 @@ import { log } from './logger.js';
 dotenv.config();
 
 const { Pool } = pkg;
-const pool = new Pool({ connectionString: process.env.PG_URI });
+import { pool } from './lib/db.js';
 
 export async function runReport() {
   if (!process.env.PG_URI) {

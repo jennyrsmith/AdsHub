@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../lib/db.js';
 import { requireApiKey } from '../lib/auth.js';
 import { Readable } from 'node:stream';
+import { facebookFetch } from '../services/facebookFetch.js';
 
 export const api = express.Router();
 
@@ -27,14 +28,22 @@ api.get('/last-sync', async (_req, res) => {
 api.get('/summary', async (req, res) => {
   try {
     const range = (req.query.range || '7').toString() === '30' ? 30 : 7;
+    const source = (req.query.source || 'auto').toString();
 
-    // Prefer rollup if present; else aggregate raw.
-    const hasRollup = await query(
-      `SELECT to_regclass('public.daily_rollup')::text AS t`
-    );
+    let useRollup = false;
+    if (source === 'rollup') {
+      useRollup = true;
+    } else if (source === 'raw') {
+      useRollup = false;
+    } else {
+      const hasRollup = await query(
+        `SELECT to_regclass('public.daily_rollup')::text AS t`
+      );
+      useRollup = hasRollup.rows?.[0]?.t === 'daily_rollup';
+    }
+
     let rows;
-
-    if (hasRollup.rows?.[0]?.t === 'daily_rollup') {
+    if (useRollup) {
       rows = (await query(
         `SELECT
            SUM(spend)               AS spend,
@@ -145,11 +154,11 @@ api.get('/export.csv', async (req, res) => {
 // Manual sync trigger (stub calls your existing job if present)
 api.post('/sync', async (_req, res) => {
   try {
-    // If you have a real sync function, call it here:
-    // await runSyncNow();
-    res.json({ ok: true, started: true });
+    const r = await facebookFetch();
+    res.json({ ok: true, rows: r.inserted });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    const status = e.status || 500;
+    res.status(status).json({ ok: false, error: e.message });
   }
 });
 

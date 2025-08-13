@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "server": "node server.js",
-    "start": "node index.js",
+    "start": "node server.js",
     "test": "node --test",
     "cron": "node cron.js",
     "healthcheck": "node healthcheck.js",
@@ -41,7 +41,8 @@
     "openai": "^4.104.0",
     "pg": "^8.11.3",
     "pg-cursor": "^2.10.3",
-    "redis": "^4.6.7"
+    "redis": "^4.6.7",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -14,6 +14,7 @@ import { yesterdayRange, todayRange } from './lib/date.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
 import authRoutes from './routes/auth.js';
 import { sessionMiddleware, requireLogin } from './middleware/auth/session.js';
+import { diagnose, startupDiagnostics } from './services/facebookClient.js';
 
 const app = express();
 app.use((req,res,next)=>{ console.log("REQ", req.method, req.path); next(); });
@@ -97,6 +98,15 @@ app.get('/api/rows', requireApiKey, async (req, res) => {
   }
 });
 
+app.get('/api/fb/diag', requireApiKey, async (_req, res) => {
+  try {
+    const report = await diagnose();
+    res.json({ ok: true, ...report });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // --- Authenticated API routes ---
 app.use('/api', requireLogin);
 app.use('/api', googleAuthRoutes);
@@ -154,6 +164,7 @@ app.listen(PORT, HOST, () => {
     `[start] adshub-api v${VERSION} listening on http://${HOST}:${PORT} (${process.env.NODE_ENV || 'dev'})`
   );
   console.log(`[config] DB host=${dbHost} sheetsEnabled=${SHEETS_ENABLED} pg_ca=${process.env.PG_CA_PATH || '(none)'}`);
+  startupDiagnostics();
 });
 
 export default app;

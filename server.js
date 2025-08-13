@@ -3,6 +3,9 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'url';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
@@ -15,6 +18,7 @@ app.set('trust proxy', true);
 
 app.use(morgan('tiny'));
 app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
 
 const origins = (process.env.CORS_ORIGINS || '')
   .split(',')
@@ -30,9 +34,10 @@ app.use(cors({
 }));
 
 const PgStore = connectPgSimple(session);
+const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 app.use(session({
   store: new PgStore({ pool }),
-  secret: process.env.SESSION_SECRET || 'change-me',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -43,13 +48,23 @@ app.use(session({
 }));
 
 // health endpoints (no API key)
-app.get('/healthz', (_req, res) => res.json({
-  ok: true,
-  service: 'adshub-api',
-  version: process.env.npm_package_version || '0.0.0',
-  sheetsEnabled: String(process.env.SHEETS_ENABLED) === 'true'
-}));
-app.get('/readyz', (_req, res) => res.json({ ok: true }));
+app.get('/healthz', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'adshub-api',
+    uptime: process.uptime(),
+    host: os.hostname(),
+    sheetsEnabled: String(process.env.SHEETS_ENABLED) === 'true'
+  });
+});
+app.get('/readyz', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(503).json({ ok: false });
+  }
+});
 
 // mount API
 app.use('/auth', authRoutes);

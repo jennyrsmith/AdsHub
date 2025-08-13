@@ -1,100 +1,30 @@
-import 'dotenv/config';
-import express from 'express';
-import morgan from 'morgan';
-import cors from 'cors';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-import cookieParser from 'cookie-parser';
-import { fileURLToPath } from 'url';
-import session from 'express-session';
-import connectPgSimple from 'connect-pg-simple';
-import api from './routes/api.js';
-import authRoutes from './routes/auth.js';
-import { pool } from './lib/db.js';
+// server.js
+import 'dotenv/config'; // load .env first
+import { createApp } from './src/app.js';
 
-const app = express();
-app.set('trust proxy', true);
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
-app.use(morgan('tiny'));
-app.use(express.json({ limit: '2mb' }));
-app.use(cookieParser());
+async function main() {
+  const app = createApp();
 
-const origins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    cb(null, origins.includes(origin));
-  },
-  credentials: true
-}));
-
-const PgStore = connectPgSimple(session);
-const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-app.use(session({
-  store: new PgStore({ pool }),
-  secret: sessionSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  }
-}));
-
-// health endpoints (no API key)
-app.get('/healthz', (_req, res) => {
-  res.json({
-    ok: true,
-    service: 'adshub-api',
-    uptime: process.uptime(),
-    host: os.hostname(),
-    sheetsEnabled: String(process.env.SHEETS_ENABLED) === 'true'
+  // Never block listening on DB readiness. App should start, /readyz reflects DB status.
+  app.listen(PORT, HOST, () => {
+    console.log(`[start] adshub-api listening on http://${HOST}:${PORT}`);
+    console.log(`[config] NODE_ENV=${process.env.NODE_ENV || 'development'}`);
   });
+}
+
+process.on('unhandledRejection', (e) => {
+  console.error('[fatal] unhandledRejection', e);
 });
-app.get('/readyz', async (_req, res) => {
-  try {
-    await pool.query('SELECT 1');
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(503).json({ ok: false });
-  }
-});
-
-// mount API
-app.use('/auth', authRoutes);
-
-// mount API
-app.use('/api', api);
-// API 404 guard
-app.use('/api', (_req, res) => res.status(404).json({ error: 'not-found' }));
-
-// static UI
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distPath = path.join(__dirname, 'ui', 'dist');
-app.use(express.static(distPath));
-
-// 404 guard (after mounting API)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/') ||
-      req.path === '/healthz' || req.path === '/readyz') {
-    return next();
-  }
-
-  if (!req.session?.user && req.path !== '/login') {
-    return res.redirect('/login');
-  }
-
-  return res.sendFile(path.join(distPath, 'index.html'));
+process.on('uncaughtException', (e) => {
+  console.error('[fatal] uncaughtException', e);
 });
 
-const port = Number(process.env.PORT || 3000);
-const host = process.env.HOST || '0.0.0.0';
-app.listen(port, host, () => {
-  console.log(`[api] listening on http://${host}:${port}`);
+main().catch((e) => {
+  console.error('[fatal] bootstrap failed', e);
+  // Still exit so PM2 restarts if something truly fatal happened
+  process.exit(1);
 });
+

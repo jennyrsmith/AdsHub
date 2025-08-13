@@ -1,46 +1,48 @@
 import 'dotenv/config';
+import { pool } from '../db.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { pool } from '../lib/db.js';
+import url from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 
-async function migrate() {
-  const dir = path.join(__dirname, '..', 'migrations');
-  const files = fs.readdirSync(dir).filter(f => /^\d+_.*\.sql$/.test(f))
-    .sort((a,b) => Number(a.split('_')[0]) - Number(b.split('_')[0]));
-
-  await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations(
-    filename TEXT PRIMARY KEY,
-    executed_at timestamptz NOT NULL DEFAULT now()
-  )`);
-
-  for (const file of files) {
-    const done = await pool.query('SELECT 1 FROM schema_migrations WHERE filename=$1', [file]);
-    if (done.rowCount) continue;
-
-    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
-    console.log(`[migrate] Running ${file}`);
-    try {
-      await pool.query('BEGIN');
-      await pool.query(sql);
-      await pool.query('INSERT INTO schema_migrations(filename) VALUES ($1)', [file]);
-      await pool.query('COMMIT');
-      console.log(`[migrate] Finished ${file}`);
-    } catch (err) {
-      await pool.query('ROLLBACK');
-      console.error('[migrate] Failed migration file:', file);
-      console.error('Message:', err.message);
-      console.error('Detail:', err.detail || '(none)');
-      console.error('Where:', err.where || '(none)');
-      console.error('Stack:', err.stack);
-      throw err;
-    }
-  }
+async function ensureMigrationsTable() {
+  await pool.query(`
+    create table if not exists schema_migrations(
+      id text primary key,
+      applied_at timestamptz not null default now()
+    )
+  `);
 }
 
-migrate()
-  .then(async () => { console.log('[migrate] Complete'); await pool.end(); })
-  .catch(async () => { await pool.end().catch(() => {}); process.exit(1); });
+async function run() {
+  console.log('[migrate] using', new URL(process.env.PG_URI).host);
+  await ensureMigrationsTable();
+  const files = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();
+  for (const file of files) {
+    const exists = await pool.query('select 1 from schema_migrations where id=$1', [file]);
+    if (exists.rowCount) continue;
+
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+    console.log('Running migration', file);
+    await pool.query('begin');
+    try {
+      await pool.query(sql);
+      await pool.query('insert into schema_migrations(id) values($1)', [file]);
+      await pool.query('commit');
+      console.log('Finished', file);
+    } catch (e) {
+      await pool.query('rollback');
+      console.error('Migration failed', file, e);
+      process.exit(1);
+    }
+  }
+  console.log('Migrations complete');
+  process.exit(0);
+}
+
+run().catch(e => {
+  console.error('Migration run failed', e);
+  process.exit(1);
+});

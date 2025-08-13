@@ -199,6 +199,32 @@ Query params:
 
 Returns `{"rows": [...], "total": number}` with a combined view of Facebook and YouTube records.
 
+## RUNBOOK
+
+```bash
+# Load env
+set -a; source .env; set +a
+
+# Seed login (runs table create if missing)
+EMAIL="jenny@beautybyearth.com" PASSWORD="bBEHappy#120!ADS" npm run seed:user
+
+# Start / restart app
+pm2 restart adshub || pm2 start ecosystem.config.cjs
+pm2 logs --lines 50
+
+# Health & API
+curl -sS https://ads.beautybyearth.com/readyz | jq
+curl -sS -H "x-api-key: $SYNC_API_KEY" "https://ads.beautybyearth.com/api/summary?range=7" | jq
+curl -sS -H "x-api-key: $SYNC_API_KEY" "https://ads.beautybyearth.com/api/rows?limit=5" | jq
+```
+
+Acceptance:
+
+- `/readyz` returns `{ ok:true }`
+- `/api/summary` returns JSON (not HTML) when given `x-api-key`
+- Visiting `https://ads.beautybyearth.com` shows Login, accepts the seeded user, and loads the dashboard.
+- Nginx serves HTTPS with a valid certificate.
+
 ### GET `/api/fb/diag`
 Returns diagnostics for the configured Facebook token and accounts. Requires header `x-api-key: SYNC_API_KEY`.
 

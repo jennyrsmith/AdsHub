@@ -1,39 +1,37 @@
 import 'dotenv/config';
-import { fetchFacebookInsights } from '../facebookInsights.js';
-import { fetchYouTubeInsights } from '../youtubeInsights.js';
-import { insertOnly } from '../saveToDatabase.js';
-import { refreshDailyRollup } from '../lib/rollups.js';
+import { DateTime } from 'luxon';
+import { facebookFetch } from '../services/facebookFetch.js';
 
 const args = process.argv.slice(2);
-const opts = {};
-for (let i = 0; i < args.length; i += 2) {
-  const key = args[i];
-  const val = args[i + 1];
-  if (key && key.startsWith('--')) opts[key.slice(2)] = val;
+function getArg(name) {
+  const idx = args.indexOf(name);
+  return idx >= 0 ? args[idx + 1] : undefined;
 }
 
-const { source, start, end } = opts;
+const source = getArg('--source');
+const start = getArg('--start');
+const end = getArg('--end');
+
 if (!source || !start || !end) {
   console.error('Usage: node scripts/backfill.js --source facebook --start YYYY-MM-DD --end YYYY-MM-DD');
   process.exit(1);
 }
 
-const fetcher = source === 'facebook'
-  ? fetchFacebookInsights
-  : source === 'youtube'
-    ? fetchYouTubeInsights
-    : null;
-
-if (!fetcher) {
-  console.error('Unknown source:', source);
+if (source !== 'facebook') {
+  console.error('Only facebook source is supported for now');
   process.exit(1);
 }
 
+const s = DateTime.fromISO(start);
+const e = DateTime.fromISO(end);
+
 (async () => {
-  const rows = await fetcher({ since: start, until: end });
-  const r = await insertOnly(source, rows);
-  await refreshDailyRollup(start, end);
-  console.log(`Backfill complete for ${source}: inserted ${r.inserted}`);
+  for (let d = s; d <= e; d = d.plus({ days: 1 })) {
+    const day = d.toISODate();
+    await facebookFetch({ since: day, until: day });
+    await new Promise(r => setTimeout(r, 500));
+  }
+  console.log('✅ backfill complete');
   process.exit(0);
 })().catch(err => {
   console.error('Backfill failed:', err.message);

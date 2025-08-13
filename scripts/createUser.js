@@ -10,21 +10,30 @@ if (!email || !password) {
   process.exit(1);
 }
 
-const hashPassword = async (plain) => {
-  const saltRounds = 12;
-  return bcrypt.hash(plain, saltRounds);
-};
-
 (async () => {
-  try {
-    const pool = await getPool();
-    const hash = await hashPassword(password);
-    await pool.query('INSERT INTO users (email, password_hash) VALUES ($1, $2)', [email, hash]);
-    console.log(`✅ User ${email} created`);
-    process.exit(0);
-  } catch (err) {
-    console.error('User creation failed:', err.message);
-    process.exit(1);
-  }
-})();
+  const pool = await getPool();
+  const hash = await bcrypt.hash(password, 12);
 
+  // make sure table exists
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+
+  await pool.query(
+    `INSERT INTO users (email, password_hash)
+     VALUES ($1,$2)
+     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
+    [email, hash]
+  );
+
+  console.log(`✅ User upserted: ${email}`);
+  process.exit(0);
+})().catch(err => {
+  console.error('❌ Failed to create user:', err.message);
+  process.exit(1);
+});

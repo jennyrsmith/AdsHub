@@ -18,3 +18,5 @@ certs/
 *.crt
 *.key
 .env.local
+
+.idea/

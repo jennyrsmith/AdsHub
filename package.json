@@ -9,7 +9,7 @@
     "dev": "NODE_ENV=development node server.js",
     "health": "curl -sS http://127.0.0.1:3000/healthz || true && echo",
     "ready": "curl -sS http://127.0.0.1:3000/readyz || true && echo",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
     "test": "node --test",
     "cron": "node cron.js",
     "healthcheck": "node healthcheck.js",

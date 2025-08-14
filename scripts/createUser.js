@@ -1,6 +1,6 @@
 // scripts/createUser.js
 import bcrypt from 'bcrypt';
-import { getPool } from '../lib/db.js';
+import { pool } from '../lib/db.js';
 
 const email = process.argv[2];
 const password = process.argv[3];
@@ -11,7 +11,6 @@ if (!email || !password) {
 }
 
 (async () => {
-  const pool = await getPool();
   const hash = await bcrypt.hash(password, 12);
 
   // make sure table exists

@@ -24,7 +24,7 @@
     "demo:clear": "node scripts/demoClear.js",
     "start:api": "node index.js",
     "start:api:wait": "wait-on http://localhost:3000/readyz && node -e \"console.log('API ready')\"",
-    "dev:all": "concurrently -k -n API,UI -c blue,green \"npm:start:api:wait\" \"npm run ui\"",
+    "dev:all": "concurrently -k -n SERVER,API,UI -c red,blue,green \"npm run server\" \"npm:start:api:wait\" \"npm run ui\"",
     "seed:user": "node scripts/createUser.js \"$EMAIL\" \"$PASSWORD\""
   },
   "dependencies": {

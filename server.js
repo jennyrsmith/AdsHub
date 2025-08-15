@@ -49,11 +49,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Serve static frontend files (adjust 'dist' if needed)
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'ui', 'build')));
 
 // Catch-all route for client-side routing
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, 'ui', 'build', 'index.html'));
 });
 
 // Graceful shutdown for App Platform

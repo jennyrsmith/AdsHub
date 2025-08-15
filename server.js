@@ -3,8 +3,8 @@ import express from 'express';
 import { pool } from './lib/db.js';
 
 const app = express();
-const HOST = process.env.HOST || '0.0.0.0';
-const PORT = Number(process.env.PORT || 3000);
+const host = process.env.HOST || '0.0.0.0';
+const port = Number(process.env.PORT || 3000);
 
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
@@ -17,6 +17,8 @@ app.get('/readyz', async (_req, res) => {
   }
 });
 
-app.listen(PORT, HOST, () => {
-  console.log(`[start] adshub-api listening on http://${HOST}:${PORT}`);
+app.listen(port, host, () => {
+  console.log(
+    `[start] adshub-api listening on http://${host}:${port} (${process.env.NODE_ENV || 'dev'})`
+  );
 });

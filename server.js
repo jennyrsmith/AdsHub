@@ -41,6 +41,20 @@ app.get('/', (_req, res) => res.send('adsHub API is up'));
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[start] adshub-api listening on 0.0.0.0:${PORT} (${process.env.NODE_ENV || 'dev'})`);
 });
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static frontend files (adjust 'dist' if needed)
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Catch-all route for client-side routing
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 // Graceful shutdown for App Platform
 const shutdown = (sig) => () => {

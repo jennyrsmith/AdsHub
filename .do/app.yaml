@@ -1,0 +1,8 @@
+spec:
+  name: adshub
+  services:
+    - name: web
+      environment_slug: node-js
+      source_dir: .
+      build_command: npm run build
+      run_command: npm start

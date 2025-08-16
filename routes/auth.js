@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import { pool } from '../lib/db.js';
+import { localAuth } from '../lib/localAuth.js';
 
 const router = express.Router();
 
@@ -32,15 +33,24 @@ router.post('/login', async (req, res) => {
     }
 
     console.log('🔍 Looking for user:', email);
-    const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
-    console.log('👤 Users found:', rows.length);
+    let user = null;
     
-    if (!rows.length) {
+    try {
+      // Try database first
+      const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+      console.log('👤 Users found in database:', rows.length);
+      user = rows[0] || null;
+    } catch (dbError) {
+      console.log('⚠️  Database unavailable, using local auth');
+      // Fallback to local authentication
+      user = await localAuth.findUserByEmail(email);
+      console.log('👤 User found in local store:', user ? 'yes' : 'no');
+    }
+    
+    if (!user) {
       console.log('❌ User not found');
       return res.status(401).json({ ok: false, message: 'Invalid credentials' });
     }
-
-    const user = rows[0];
     console.log('🔑 Verifying password for user ID:', user.id);
     const match = await bcrypt.compare(password, user.password_hash);
     console.log('🔐 Password match:', match);

@@ -9,10 +9,14 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
+    "autoprefixer": "^10.4.21",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.8.1",
+    "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
     "@vitejs/plugin-react": "^4.0.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",

@@ -1,9 +1,21 @@
 name: adshub
 services:
-  - name: web
-    source_dir: .
-    build_command: npm install && npm run build
-    run_command: npm start
-    envs:
-      - key: NODE_ENV
-        value: production
+- name: web
+  source_dir: /
+  github:
+    repo: jennyrsmith/AdsHub
+    branch: main
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  build_command: |
+    npm ci
+    npm run build
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: HOST
+    value: 0.0.0.0
+  - key: PORT
+    value: "8080"

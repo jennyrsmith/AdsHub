@@ -29,7 +29,8 @@
     "start:api": "node index.js",
     "start:api:wait": "wait-on http://localhost:3000/readyz && node -e \"console.log('API ready')\"",
     "dev:all": "concurrently -k -n SERVER,API,UI -c red,blue,green \"npm run start\" \"npm run start:api:wait\" \"npm run ui\"",
-    "seed:user": "node scripts/createUser.js \"$EMAIL\" \"$PASSWORD\""
+    "seed:user": "node scripts/createUser.js \"$EMAIL\" \"$PASSWORD\"",
+    "init:admin": "node scripts/initAdmin.js"
   },
   "dependencies": {
     "axios": "^1.6.7",

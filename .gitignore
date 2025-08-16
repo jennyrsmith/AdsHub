@@ -19,4 +19,7 @@ certs/
 *.key
 .env.local
 
+# Team credentials (confidential)
+TEAM_CREDENTIALS.txt
+
 .idea/

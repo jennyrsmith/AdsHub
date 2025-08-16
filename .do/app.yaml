@@ -13,6 +13,7 @@ services:
     npm ci
     npm run build
     npm run init:admin
+    npm run init:team
   envs:
   - key: NODE_ENV
     value: production

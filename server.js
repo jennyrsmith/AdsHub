@@ -6,6 +6,8 @@ import express from 'express';
 import { pool } from './lib/db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { sessionMiddleware } from './middleware/auth/session.js';
+import authRoutes from './routes/auth.js';
 
 // Setup __dirname for ES modules (since __dirname isn't available by default)
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +21,19 @@ const PORT = Number(process.env.PORT || 3000);
 
 // Trust the proxy (e.g. App Platform or Nginx) for things like IP and protocol headers
 app.set('trust proxy', true);
+
+// ========================================
+// ✅ Middleware Setup
+// ========================================
+
+// Parse JSON bodies for API requests
+app.use(express.json());
+
+// Setup session management
+app.use(sessionMiddleware);
+
+// Mount authentication routes
+app.use('/auth', authRoutes);
 
 // --- Health Check Endpoint ---
 // Used by App Platform to verify the container is alive

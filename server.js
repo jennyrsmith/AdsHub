@@ -45,9 +45,7 @@ app.get('/readyz', async (_req, res) => {
   }
 });
 
-// --- Simple Root Route for Sanity Testing ---
-// Optional: returns text at the root URL
-app.get('/', (_req, res) => res.send('adsHub API is up'));
+// Root route will be handled by the React app catch-all below
 
 
 // ========================================

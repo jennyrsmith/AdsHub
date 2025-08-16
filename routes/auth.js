@@ -49,8 +49,10 @@ router.post('/logout', (req, res) => {
 
 // GET /auth/me
 router.get('/me', (req, res) => {
-  if (req.session?.user) return res.json({ email: req.session.user.email });
-  res.status(401).json({ error: 'unauthorized' });
+  if (req.session?.user) {
+    return res.json({ ok: true, user: req.session.user });
+  }
+  res.status(401).json({ ok: false, error: 'unauthorized' });
 });
 
 export default router;

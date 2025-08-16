@@ -6,8 +6,12 @@ import { facebookFetch } from '../services/facebookFetch.js';
 
 export const api = express.Router();
 
-// Protect everything under /api
-api.use(requireApiKey);
+// Protect everything under /api (skip for development)
+if (process.env.NODE_ENV === 'production') {
+  api.use(requireApiKey);
+} else {
+  console.log('🔓 API key protection disabled for development');
+}
 
 // Last sync (optional table sync_log)
 api.get('/last-sync', async (_req, res) => {

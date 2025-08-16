@@ -4,11 +4,21 @@ import { pool } from '../../lib/db.js';
 
 const PgSession = pgSession(session);
 
-export const sessionMiddleware = session({
-  store: new PgSession({
+// Try to create PG session store, fallback to memory store
+let sessionStore;
+try {
+  sessionStore = new PgSession({
     pool,
     tableName: 'user_sessions'
-  }),
+  });
+  console.log('🗄️  Using PostgreSQL session store');
+} catch (err) {
+  console.log('⚠️  PostgreSQL session store failed, using memory store');
+  sessionStore = undefined; // Will use default memory store
+}
+
+export const sessionMiddleware = session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'change-this-secret',
   resave: false,
   saveUninitialized: false,

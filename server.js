@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { sessionMiddleware } from './middleware/auth/session.js';
 import authRoutes from './routes/auth.js';
+import { api } from './routes/api.js';
 
 // Setup __dirname for ES modules (since __dirname isn't available by default)
 const __filename = fileURLToPath(import.meta.url);
@@ -34,6 +35,9 @@ app.use(sessionMiddleware);
 
 // Mount authentication routes
 app.use('/auth', authRoutes);
+
+// Mount API routes
+app.use('/api', api);
 
 // --- Health Check Endpoint ---
 // Used by App Platform to verify the container is alive

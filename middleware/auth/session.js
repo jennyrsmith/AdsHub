@@ -4,16 +4,21 @@ import { pool } from '../../lib/db.js';
 
 const PgSession = pgSession(session);
 
-// Try to create PG session store, fallback to memory store
+// Use memory store for development, PG store for production
 let sessionStore;
-try {
-  sessionStore = new PgSession({
-    pool,
-    tableName: 'user_sessions'
-  });
-  console.log('🗄️  Using PostgreSQL session store');
-} catch (err) {
-  console.log('⚠️  PostgreSQL session store failed, using memory store');
+if (process.env.NODE_ENV === 'production' && process.env.PG_URI) {
+  try {
+    sessionStore = new PgSession({
+      pool,
+      tableName: 'user_sessions'
+    });
+    console.log('🗄️  Using PostgreSQL session store');
+  } catch (err) {
+    console.log('⚠️  PostgreSQL session store failed, using memory store');
+    sessionStore = undefined;
+  }
+} else {
+  console.log('💾 Using memory session store for development');
   sessionStore = undefined; // Will use default memory store
 }
 

@@ -14,6 +14,11 @@ const TEAM_USERS = [
     email: 'naazdeep@beautybyearth.com', 
     password: 'NaazBBE#2025!TeamLead',
     role: 'admin'
+  },
+  {
+    email: 'manuel@beautybyearth.com',
+    password: 'ManuelBBE&2025!DeV',
+    role: 'admin'
   }
 ];
 

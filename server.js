@@ -54,13 +54,21 @@ app.get('/', (_req, res) => res.send('adsHub API is up'));
 // ✅ Serve Vite-built frontend (from ui/dist)
 // ========================================
 
-// Serve static assets (JS, CSS, images, etc.)
-app.use(express.static(path.join(__dirname, 'ui', 'dist')));
+const uiDistPath = path.join(__dirname, 'ui', 'dist');
+console.log(`[STATIC] ${uiDistPath}`);
 
-// Catch-all route: return index.html for any non-API route
+// Serve static assets (JS, CSS, images, etc.)
+app.use(express.static(uiDistPath));
+
+// Catch-all route: return index.html for any non-API GET request
 // This enables React Router or Vite SPA routing to work on direct page loads
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'ui', 'dist', 'index.html'));
+  res.sendFile(path.join(uiDistPath, 'index.html'));
+});
+
+// Fallback 404 for any non-matched routes/methods
+app.use((_req, res) => {
+  res.status(404).send('Not found');
 });
 
 

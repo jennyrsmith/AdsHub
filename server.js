@@ -1,10 +1,11 @@
-// Load environment variables from .env file
-import 'dotenv/config';
+// Load environment variables from appropriate .env file
+import './lib/env.js';
 
 // Import required modules
 import express from 'express';
 import { pool } from './lib/db.js';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { sessionMiddleware } from './middleware/auth/session.js';
 import authRoutes from './routes/auth.js';
@@ -74,20 +75,45 @@ app.get('/readyz', async (_req, res) => {
 const uiDistPath = path.join(__dirname, 'ui', 'dist');
 console.log(`[STATIC] ${uiDistPath}`);
 
-// Serve static assets (JS, CSS, images, etc.)
-app.use(express.static(uiDistPath));
+// Serve static assets (JS, CSS, images, etc.) with proper headers
+app.use(express.static(uiDistPath, {
+  maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  setHeaders: (res, path) => {
+    // Set proper MIME types for assets
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
 
 // Catch-all route: return index.html for any non-API, non-static GET request
 // This enables React Router or Vite SPA routing to work on direct page loads
 app.get('*', (req, res) => {
-  // Don't serve HTML for API routes or static assets
+  // Don't serve HTML for API routes, static assets, or files with extensions
   if (req.path.startsWith('/auth') || 
       req.path.startsWith('/api') || 
       req.path.startsWith('/assets') ||
-      req.path.includes('.')) {
-    return res.status(404).send('Not found');
+      req.path.includes('.') ||
+      req.path.startsWith('/healthz') ||
+      req.path.startsWith('/readyz')) {
+    return res.status(404).json({ error: 'Not found', path: req.path });
   }
-  res.sendFile(path.join(uiDistPath, 'index.html'));
+  
+  // For valid SPA routes, serve index.html
+  const indexPath = path.join(uiDistPath, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return res.status(500).json({ 
+      error: 'Frontend build not found', 
+      path: indexPath,
+      hint: 'Run npm run build to generate the frontend'
+    });
+  }
+  
+  res.sendFile(indexPath);
 });
 
 

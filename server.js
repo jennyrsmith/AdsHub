@@ -31,8 +31,35 @@ app.set('trust proxy', true);
 // Parse JSON bodies for API requests
 app.use(express.json());
 
-// Setup session management
-app.use(sessionMiddleware);
+// ========================================
+// ✅ Serve Static Files FIRST (before any middleware that might fail)
+// ========================================
+const uiDistPath = path.join(__dirname, 'ui', 'dist');
+console.log(`[STATIC] ${uiDistPath}`);
+
+// Serve static assets (JS, CSS, images, etc.) with proper headers
+app.use(express.static(uiDistPath, {
+  maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  setHeaders: (res, path) => {
+    // Set proper MIME types for assets
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
+
+// Setup session management with error handling
+try {
+  app.use(sessionMiddleware);
+  console.log('✅ Session middleware loaded');
+} catch (err) {
+  console.error('⚠️  Session middleware failed:', err.message);
+  // Continue without session middleware to allow static files to work
+}
 
 // Mount authentication routes
 app.use('/auth', authRoutes);
@@ -65,30 +92,7 @@ app.get('/readyz', async (_req, res) => {
   }
 });
 
-// Root route will be handled by the React app catch-all below
-
-
-// ========================================
-// ✅ Serve Vite-built frontend (from ui/dist)
-// ========================================
-
-const uiDistPath = path.join(__dirname, 'ui', 'dist');
-console.log(`[STATIC] ${uiDistPath}`);
-
-// Serve static assets (JS, CSS, images, etc.) with proper headers
-app.use(express.static(uiDistPath, {
-  maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
-  setHeaders: (res, path) => {
-    // Set proper MIME types for assets
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    } else if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    } else if (path.endsWith('.json')) {
-      res.setHeader('Content-Type', 'application/json');
-    }
-  }
-}));
+// Static files served above, before other middleware
 
 // Catch-all route: return index.html for any non-API, non-static GET request
 // This enables React Router or Vite SPA routing to work on direct page loads

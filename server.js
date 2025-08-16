@@ -73,15 +73,17 @@ console.log(`[STATIC] ${uiDistPath}`);
 // Serve static assets (JS, CSS, images, etc.)
 app.use(express.static(uiDistPath));
 
-// Catch-all route: return index.html for any non-API GET request
+// Catch-all route: return index.html for any non-API, non-static GET request
 // This enables React Router or Vite SPA routing to work on direct page loads
-app.get('*', (_req, res) => {
+app.get('*', (req, res) => {
+  // Don't serve HTML for API routes or static assets
+  if (req.path.startsWith('/auth') || 
+      req.path.startsWith('/api') || 
+      req.path.startsWith('/assets') ||
+      req.path.includes('.')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(uiDistPath, 'index.html'));
-});
-
-// Fallback 404 for any non-matched routes/methods
-app.use((_req, res) => {
-  res.status(404).send('Not found');
 });
 
 

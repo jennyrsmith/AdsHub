@@ -9,8 +9,19 @@ export default function App() {
 
   useEffect(() => {
     fetch('/auth/me')
-      .then(res => res.json())
-      .then(data => { if (data.ok) setUser(data.user); })
+      .then(res => {
+        if (!res.ok) throw new Error('Not authenticated');
+        return res.json();
+      })
+      .then(data => { 
+        if (data.ok && data.user) {
+          setUser(data.user); 
+        }
+      })
+      .catch(err => {
+        console.log('Not authenticated:', err.message);
+        // User not authenticated, will show login page
+      })
       .finally(() => setLoading(false));
   }, []);
 

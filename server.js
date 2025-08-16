@@ -31,6 +31,26 @@ app.set('trust proxy', true);
 // Parse JSON bodies for API requests
 app.use(express.json());
 
+// Parse cookies for fallback authentication
+app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  // Simple cookie parser
+  req.cookies = {};
+  if (req.headers.cookie) {
+    req.headers.cookie.split(';').forEach(cookie => {
+      const [name, value] = cookie.trim().split('=');
+      if (name && value) {
+        try {
+          req.cookies[name] = decodeURIComponent(value);
+        } catch (e) {
+          req.cookies[name] = value;
+        }
+      }
+    });
+  }
+  next();
+});
+
 // ========================================
 // ✅ Serve Static Files FIRST (before any middleware that might fail)
 // ========================================
@@ -52,20 +72,20 @@ app.use(express.static(uiDistPath, {
   }
 }));
 
-// Mount authentication routes FIRST (before session middleware to ensure they're always available)
-app.use('/auth', authRoutes);
-
-// Mount API routes
-app.use('/api', api);
-
 // Setup session management with error handling
 try {
   app.use(sessionMiddleware);
   console.log('✅ Session middleware loaded');
 } catch (err) {
   console.error('⚠️  Session middleware failed:', err.message);
-  // Continue without session middleware - auth routes will still work for login
+  // Continue without session middleware to allow static files to work
 }
+
+// Mount authentication routes
+app.use('/auth', authRoutes);
+
+// Mount API routes
+app.use('/api', api);
 
 // --- Health Check Endpoint ---
 // Used by App Platform to verify the container is alive

@@ -105,9 +105,17 @@ router.post('/login', async (req, res) => {
       console.log('✅ Login successful, session created');
       res.json({ ok: true, user: req.session.user });
     } else {
-      console.log('⚠️  Session middleware not available, sending success without session');
+      console.log('⚠️  Session middleware not available, using stateless login');
       const userData = { id: user.id, email: user.email, role: user.role };
-      res.json({ ok: true, user: userData, warning: 'Session not available' });
+      
+      // Set a simple cookie as fallback when sessions don't work
+      res.cookie('user_data', JSON.stringify(userData), {
+        httpOnly: false, // Allow client to read for now
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      });
+      
+      res.json({ ok: true, user: userData, warning: 'Using cookie fallback' });
     }
   } catch (err) {
     console.error('💥 Login error:', err);
@@ -125,10 +133,24 @@ router.post('/logout', (req, res) => {
 
 // GET /auth/me
 router.get('/me', (req, res) => {
+  // Check session first
   if (req.session?.user) {
     return res.json({ ok: true, user: req.session.user });
   }
-  // If no session middleware, user is not authenticated
+  
+  // Fallback to cookie if session isn't available
+  try {
+    if (req.cookies?.user_data) {
+      const userData = JSON.parse(req.cookies.user_data);
+      if (userData?.id && userData?.email) {
+        return res.json({ ok: true, user: userData, source: 'cookie' });
+      }
+    }
+  } catch (err) {
+    console.log('Cookie parse error:', err.message);
+  }
+  
+  // No valid authentication found
   res.status(401).json({ ok: false, error: 'unauthorized' });
 });
 

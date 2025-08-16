@@ -5,6 +5,40 @@ import { localAuth } from '../lib/localAuth.js';
 
 const router = express.Router();
 
+// Debug endpoint to check environment and database status
+router.get('/debug', async (req, res) => {
+  try {
+    const debug = {
+      env: process.env.NODE_ENV,
+      hasDbUri: !!process.env.PG_URI,
+      hasSession: !!req.session,
+      hasSessionSecret: !!process.env.SESSION_SECRET
+    };
+    
+    // Test database connection
+    try {
+      await pool.query('SELECT 1');
+      debug.dbConnected = true;
+    } catch (err) {
+      debug.dbConnected = false;
+      debug.dbError = err.message;
+    }
+    
+    // Test local auth
+    try {
+      const testUser = await localAuth.findUserByEmail('jenny@beautybyearth.com');
+      debug.localAuthWorks = !!testUser;
+    } catch (err) {
+      debug.localAuthWorks = false;
+      debug.localAuthError = err.message;
+    }
+    
+    res.json(debug);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /auth/register  (admin only)
 router.post('/register', async (req, res) => {
   try {
@@ -24,7 +58,7 @@ router.post('/register', async (req, res) => {
 // POST /auth/login
 router.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt:', req.body);
+    console.log('🔐 Login attempt for:', req.body?.email);
     const { email, password } = req.body;
     
     if (!email || !password) {
@@ -33,14 +67,19 @@ router.post('/login', async (req, res) => {
     }
 
     console.log('🔍 Looking for user:', email);
+    console.log('🌍 Environment:', process.env.NODE_ENV);
+    console.log('🗄️  PG_URI exists:', !!process.env.PG_URI);
     let user = null;
     
     try {
       // Try database first
+      console.log('🔗 Attempting database connection...');
       const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
       console.log('👤 Users found in database:', rows.length);
       user = rows[0] || null;
+      console.log('📊 Database query successful');
     } catch (dbError) {
+      console.error('🚨 Database error:', dbError.message);
       console.log('⚠️  Database unavailable, using local auth');
       // Fallback to local authentication
       user = await localAuth.findUserByEmail(email);

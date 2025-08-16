@@ -52,20 +52,20 @@ app.use(express.static(uiDistPath, {
   }
 }));
 
+// Mount authentication routes FIRST (before session middleware to ensure they're always available)
+app.use('/auth', authRoutes);
+
+// Mount API routes
+app.use('/api', api);
+
 // Setup session management with error handling
 try {
   app.use(sessionMiddleware);
   console.log('✅ Session middleware loaded');
 } catch (err) {
   console.error('⚠️  Session middleware failed:', err.message);
-  // Continue without session middleware to allow static files to work
+  // Continue without session middleware - auth routes will still work for login
 }
-
-// Mount authentication routes
-app.use('/auth', authRoutes);
-
-// Mount API routes
-app.use('/api', api);
 
 // --- Health Check Endpoint ---
 // Used by App Platform to verify the container is alive

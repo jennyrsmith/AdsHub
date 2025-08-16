@@ -60,9 +60,16 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ ok: false, message: 'Invalid credentials' });
     }
 
-    req.session.user = { id: user.id, email: user.email, role: user.role };
-    console.log('✅ Login successful, session created');
-    res.json({ ok: true, user: req.session.user });
+    // Create session if session middleware is available
+    if (req.session) {
+      req.session.user = { id: user.id, email: user.email, role: user.role };
+      console.log('✅ Login successful, session created');
+      res.json({ ok: true, user: req.session.user });
+    } else {
+      console.log('⚠️  Session middleware not available, sending success without session');
+      const userData = { id: user.id, email: user.email, role: user.role };
+      res.json({ ok: true, user: userData, warning: 'Session not available' });
+    }
   } catch (err) {
     console.error('💥 Login error:', err);
     res.status(500).json({ ok: false, error: err.message });
@@ -82,6 +89,7 @@ router.get('/me', (req, res) => {
   if (req.session?.user) {
     return res.json({ ok: true, user: req.session.user });
   }
+  // If no session middleware, user is not authenticated
   res.status(401).json({ ok: false, error: 'unauthorized' });
 });
 

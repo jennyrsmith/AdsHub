@@ -31,7 +31,8 @@
     "dev:all": "concurrently -k -n SERVER,API,UI -c red,blue,green \"npm run start\" \"npm run start:api:wait\" \"npm run ui\"",
     "seed:user": "node scripts/createUser.js \"$EMAIL\" \"$PASSWORD\"",
     "init:admin": "node scripts/initAdmin.js",
-    "init:team": "node scripts/initTeamUsers.js"
+    "init:team": "node scripts/initTeamUsers.js",
+    "create:admin": "node scripts/createAdminLocal.js"
   },
   "dependencies": {
     "axios": "^1.6.7",

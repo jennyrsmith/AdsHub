@@ -14,7 +14,8 @@ if (process.env.NODE_ENV === 'production' && process.env.PG_URI) {
     });
     console.log('🗄️  Using PostgreSQL session store');
   } catch (err) {
-    console.log('⚠️  PostgreSQL session store failed, using memory store');
+    console.error('⚠️  PostgreSQL session store failed:', err.message);
+    console.log('💾 Falling back to memory session store');
     sessionStore = undefined;
   }
 } else {

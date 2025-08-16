@@ -1,5 +1,6 @@
 // scripts/createAdminLocal.js
 // Create admin user locally for testing
+import '../lib/env.js'; // Load appropriate environment
 import bcrypt from 'bcrypt';
 import { pool } from '../lib/db.js';
 

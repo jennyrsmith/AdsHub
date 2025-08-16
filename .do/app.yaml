@@ -11,6 +11,7 @@ services:
   instance_size_slug: basic-xxs
   build_command: |
     npm ci
+    cd ui && npm ci && cd ..
     npm run build
     npm run init:admin
     npm run init:team

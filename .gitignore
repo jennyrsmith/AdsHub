@@ -22,4 +22,8 @@ certs/
 # Team credentials (confidential)
 TEAM_CREDENTIALS.txt
 
+# Local development environment
+.env.local
+docker-compose.override.yml
+
 .idea/
